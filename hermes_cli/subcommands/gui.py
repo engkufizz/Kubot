@@ -6,12 +6,15 @@ from typing import Callable
 
 
 def build_gui_parser(subparsers, *, cmd_gui: Callable) -> None:
-    """Attach the ``gui`` subcommand to ``subparsers``."""
+    """Attach the ``desktop`` subcommand to ``subparsers``."""
     gui_parser = subparsers.add_parser(
-        "desktop", aliases=["gui"], help="Build and launch the native desktop app",
-        description="Launch the Hermes Electron desktop app. By default this installs "
-            "workspace Node dependencies, builds the current OS's unpacked "
-            "Electron app, then launches that packaged artifact.")
+        "desktop", aliases=["gui"], help="Launch the pure-Python Kubot Desktop application",
+        description="Launch the pure-Python Kubot Desktop application (opens in a dedicated application window).")
+    gui_parser.add_argument("--host", default="127.0.0.1", help="Host to bind backend (default: 127.0.0.1)")
+    gui_parser.add_argument("--port", type=int, default=9119, help="Port to bind backend (default: 9119)")
+    gui_parser.add_argument("--open-profile", default="", help="Profile to open")
+    gui_parser.add_argument("--no-open", action="store_true", help="Don't open window automatically")
+    gui_parser.set_defaults(func=cmd_gui)
     gui_parser.add_argument(
         "--source", action="store_true",
         help="Launch via `electron .` against apps/desktop/dist instead of the packaged app")

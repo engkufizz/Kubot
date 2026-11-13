@@ -393,6 +393,13 @@ def _resolve_stdio_command(command: str, env: dict) -> tuple[str, dict]:
     resolved_command = os.path.expanduser(str(command).strip())
     resolved_env = dict(env or {})
     launcher = re.sub(r"\.(cmd|exe)$", "", resolved_command, flags=re.IGNORECASE)  # Windows spellings
+    launcher_base = os.path.basename(launcher).lower()
+    if launcher_base in {"npx", "npm", "node", "pnpm", "yarn", "bun"}:
+        raise RuntimeError(
+            f"Kubot runs in pure-Python mode with zero Node.js dependencies. "
+            f"The requested command/launcher '{launcher_base}' is disabled. "
+            f"Please configure a pure-Python MCP server or command."
+        )
     managed = _managed_launcher(launcher) if launcher in _MANAGED_LAUNCHERS else None
     if managed is not None:
         resolved_command, dirs = managed

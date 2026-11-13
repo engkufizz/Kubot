@@ -52,6 +52,15 @@ async def _preflight_stdio_command(server_name: str, command: str, args: list) -
     if malware_error:
         raise ValueError(f"MCP server '{server_name}': {malware_error}")
 
+    # Kubot Zero Node.js architecture rule: disable Node/npm/npx subprocesses cleanly
+    launcher_base = re.sub(r"\.(cmd|exe)$", "", os.path.basename(command), flags=re.IGNORECASE).lower()
+    if launcher_base in {"npx", "npm", "node", "pnpm", "yarn", "bun"}:
+        raise ValueError(
+            f"Kubot runs in pure-Python mode with zero Node.js dependencies. "
+            f"The requested tool/MCP server launcher '{launcher_base}' is disabled. "
+            f"Please configure a pure-Python MCP server or an HTTP/SSE endpoint."
+        )
+
     # npx resolves the package and then FORKS, staying resident as the real server's parent for
     # nothing (~48 MB per server, measured). Hermes already supervises the child (shared death
     # supervisor), so a cached package is spawned directly; a cache miss leaves npx untouched.

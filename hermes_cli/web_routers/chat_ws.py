@@ -13,7 +13,8 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 
 from agent.interrupt_scope import InterruptScope, bind_interrupt_scope
 from hermes_cli.active_sessions import ActiveSessionRegistryError, active_session_registry_snapshot
@@ -758,3 +759,50 @@ async def events_ws(ws: WebSocket) -> None:
                 subs.discard(ws)
                 if not subs:
                     event_channels.pop(channel, None)
+
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+    model: Optional[str] = None
+
+
+@router.post("/api/chat")
+async def chat_endpoint(body: ChatRequest, request: Request):
+    """Run an agent conversation turn via pure-Python REST."""
+    message = body.message.strip()
+    if not message:
+        return {"status": "error", "reply": "Empty message", "session_id": body.session_id or "default"}
+
+    if message.startswith("/"):
+        try:
+            from hermes_cli.console_engine import HermesConsoleEngine
+            engine = HermesConsoleEngine()
+            result = await asyncio.to_thread(engine.execute, message.lstrip("/"))
+            return {
+                "status": "ok",
+                "reply": result.output or f"Command executed with status: {result.status}",
+                "session_id": body.session_id or "default",
+            }
+        except Exception as exc:
+            return {
+                "status": "error",
+                "reply": f"Command error: {exc}",
+                "session_id": body.session_id or "default",
+            }
+
+    try:
+        from run_agent import AIAgent
+        agent = AIAgent()
+        response = await asyncio.to_thread(agent.run_conversation, message)
+        return {
+            "status": "ok",
+            "reply": str(response) if response else "(No response)",
+            "session_id": getattr(agent, "session_id", body.session_id or "default"),
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "reply": f"Agent error: {exc}",
+            "session_id": body.session_id or "default",
+        }

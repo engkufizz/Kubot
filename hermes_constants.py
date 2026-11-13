@@ -68,12 +68,12 @@ def _expand_hermes_home(path: str) -> Path:
 
 def _platform_default_hermes_home(environ: Mapping[str, str], user_home: Callable[[], Path]) -> Path:
     """The platform default that *environ* names, with the literal data-directory suffix."""
-    suffix = environ.get("HERMES_DATA_DIR_SUFFIX", "")
+    suffix = environ.get("KUBOT_DATA_DIR_SUFFIX", environ.get("HERMES_DATA_DIR_SUFFIX", ""))
     if sys.platform == "win32":
         local_appdata = environ.get("LOCALAPPDATA", "").strip()
         base = Path(local_appdata) if local_appdata else user_home() / "AppData" / "Local"
-        return base / ("hermes" + suffix)
-    return user_home() / (".hermes" + suffix)
+        return base / ("kubot" + suffix)
+    return user_home() / (".kubot" + suffix)
 
 
 def _get_platform_default_hermes_home() -> Path:
@@ -139,7 +139,7 @@ def hermes_root_for_environment(environ: Mapping[str, str]) -> Path | None:
             raise LookupError("no user profile folder")
         return Path(profile)
 
-    raw = names.get("HERMES_HOME", "").strip()
+    raw = names.get("KUBOT_HOME", names.get("HERMES_HOME", "")).strip()
     try:
         native_home = _platform_default_hermes_home(names, user_home)
         if not raw:
@@ -204,11 +204,11 @@ def _warn_profile_fallback_once() -> None:
 
 
 def get_hermes_home() -> Path:
-    """Hermes home: context-local override → ``HERMES_HOME`` env var → platform default."""
+    """Kubot home: context-local override → KUBOT_HOME/HERMES_HOME env var → platform default."""
     override = get_hermes_home_override()
     if override:
         return _expand_hermes_home(override)
-    if not os.environ.get("HERMES_HOME", "").strip():
+    if not os.environ.get("KUBOT_HOME", os.environ.get("HERMES_HOME", "")).strip():
         _warn_profile_fallback_once()
     return get_process_hermes_home()
 
@@ -260,7 +260,7 @@ def get_process_hermes_home() -> Path:
     ``HERMES_HOME`` live on purpose: routed-profile DECISIONS compare against
     :func:`get_routing_process_hermes_home` instead (#119242).
     """
-    val = os.environ.get("HERMES_HOME", "").strip()
+    val = os.environ.get("KUBOT_HOME", os.environ.get("HERMES_HOME", "")).strip()
     return _expand_hermes_home(val) if val else _get_platform_default_hermes_home()
 
 

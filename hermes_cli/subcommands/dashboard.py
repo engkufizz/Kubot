@@ -77,8 +77,8 @@ def build_dashboard_parser(
     subparsers, *, cmd_dashboard: Callable, cmd_dashboard_register: Callable) -> None:
     """Attach ``dashboard`` (browser UI) and ``serve`` (headless backend the desktop spawns)."""
     dashboard_parser = subparsers.add_parser(
-        "dashboard", help="Start the web UI dashboard",
-        description="Launch the Hermes Agent web dashboard for managing config, API keys, and sessions",
+        "dashboard", aliases=["ui", "web"], help="Start the pure-Python Kubot web dashboard",
+        description="Launch the Kubot web dashboard for managing chat, sessions, config, models, and skills",
     )
     _add_server_runtime_args(dashboard_parser)
     dashboard_parser.add_argument(

@@ -1,0 +1,26 @@
+# =============================================================================
+# Kubot Configuration (config.yaml)
+# =============================================================================
+# Save this file to ~/.kubot/config.yaml or in your working directory.
+
+model:
+  default: "deepseek/deepseek-chat"
+  provider: "deepseek"
+  base_url: "https://api.deepseek.com/v1"
+
+agent:
+  name: "Kubot"
+  reasoning_effort: "medium"
+  autonomous_goal_loop: true
+  max_turns: 50
+
+security:
+  safe_mode: false
+  workspace_boundary_strict: true
+  prevent_outside_workspace_edits: true
+  prohibit_node_subprocesses: true
+
+display:
+  skin: "default"
+  theme: "cyan-slate"
+  banner: true

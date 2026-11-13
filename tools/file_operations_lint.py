@@ -28,7 +28,7 @@ LINTERS = {
 # Node linters Hermes runs on the host (local backend) under its PM-managed Node,
 # never the user's: the terminal PATH puts the user's dirs first, and ``npx tsc``
 # re-execs ``env node`` through that PATH.
-_MANAGED_NODE_LINTERS = {'.js': ('node', '--check'), '.ts': ('npx', 'tsc', '--noEmit')}
+_MANAGED_NODE_LINTERS = {}
 
 # Per-file shell linters that flood phantom errors on real projects (single-file
 # ``tsc`` ignores tsconfig, ``go vet`` fails outside a module, ``rustfmt --check``

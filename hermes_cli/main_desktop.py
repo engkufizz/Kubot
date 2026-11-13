@@ -1695,38 +1695,76 @@ def _run_desktop_one_shot(args: argparse.Namespace, desktop_dir: Path, *, bundle
 
 
 def cmd_gui(args: argparse.Namespace):
-    """Build and launch the native Electron desktop GUI."""
-    from hermes_cli.main import PROJECT_ROOT
-    from hermes_cli.source_build import prepare_source_dependencies, source_build_env
-    desktop_dir = PROJECT_ROOT / "apps" / "desktop"
-    # A bundled install IS the app: no source tree, no build, and the
-    # launcher is a sibling of this payload rather than something we
-    # produce. Every rung below assembles a checkout build, so the sealed
-    # shape leaves here with the env it just built.
-    from hermes_cli.steward import is_bundled_payload
+    """Launch the pure-Python Kubot Desktop application."""
+    import threading
+    import time
+    import webbrowser
+    import urllib.request
+    from hermes_cli.web_server import start_server
 
-    bundled = is_bundled_payload(PROJECT_ROOT)
-    if not bundled and not (desktop_dir / "package.json").exists():
-        # A package-manager install (Homebrew, pip, ...) ships no desktop
-        # source tree, so building here is impossible by construction (#61056).
-        # Prefer the separately installed desktop app; otherwise explain the
-        # packaging shape instead of the generic missing-source error.
-        install_kind = _site_packages_install_kind(PROJECT_ROOT)
-        if install_kind is not None and _launch_installed_macos_desktop_app():
-            sys.exit(0)
-        print(f"Desktop GUI source not found at: {desktop_dir}")
-        if install_kind == "homebrew":
-            print(
-                "  This Hermes came from Homebrew, which does not ship the desktop app's\n"
-                "  source tree, so it cannot be built from this install.\n"
-                "  Install the desktop app from https://hermes-agent.nousresearch.com,\n"
-                "  or run `hermes desktop` from a source checkout."
+    host = getattr(args, "host", "127.0.0.1") or "127.0.0.1"
+    port = getattr(args, "port", 9119) or 9119
+
+    def _run_server():
+        try:
+            start_server(
+                host=host,
+                port=port,
+                open_browser=False,
+                allow_public=False,
+                initial_profile=getattr(args, "open_profile", "") or "",
+                headless=False,
             )
-        sys.exit(1)
+        except Exception as exc:
+            logger.debug("Desktop backend exited: %s", exc)
 
-    with contextlib.suppress(Exception):
-        from hermes_logging import setup_logging as _setup_logging_gui
-        _setup_logging_gui(mode="gui")
+    t = threading.Thread(target=_run_server, daemon=True, name="kubot-desktop-backend")
+    t.start()
+
+    url = f"http://{host}:{port}"
+    print(f"Launching Kubot Desktop on {url}...")
+    ready = False
+    for _ in range(40):
+        try:
+            with urllib.request.urlopen(f"{url}/api/status", timeout=1.0) as resp:
+                if resp.status == 200:
+                    ready = True
+                    break
+        except Exception:
+            time.sleep(0.25)
+
+    if not getattr(args, "no_open", False):
+        launched = False
+        try:
+            import webview
+            webview.create_window("Kubot Desktop", url, width=1280, height=840)
+            webview.start()
+            launched = True
+        except Exception:
+            pass
+
+        if not launched and sys.platform == "win32":
+            for browser_cmd in [
+                ["msedge", f"--app={url}"],
+                ["chrome", f"--app={url}"],
+            ]:
+                try:
+                    subprocess.Popen(browser_cmd, shell=True)
+                    launched = True
+                    break
+                except Exception:
+                    continue
+
+        if not launched:
+            webbrowser.open(url)
+
+    print("Kubot Desktop running. Press Ctrl+C to stop.")
+    try:
+        while t.is_alive():
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nStopping Kubot Desktop...")
+        sys.exit(0)
 
     env, config_electron_flags = _desktop_launch_env(args)
 

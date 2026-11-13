@@ -68,11 +68,12 @@ def normalize_hermes_home_env() -> None:
     reader the same absolute spelling; ``hermes_constants`` expands as well for non-CLI
     entry points. A relative value that is not tilde/variable-shaped is left alone.
     """
-    raw = os.environ.get("HERMES_HOME", "")
+    raw = os.environ.get("KUBOT_HOME", os.environ.get("HERMES_HOME", ""))
     if not raw.strip():
         return
     expanded = os.path.expanduser(os.path.expandvars(raw.strip()))
     if expanded != raw:
+        os.environ["KUBOT_HOME"] = expanded
         os.environ["HERMES_HOME"] = expanded
 
 
@@ -129,11 +130,11 @@ def active_profile_may_override_home(hermes_root: str) -> bool:
 
 
 def _default_home() -> str:
-    return os.path.join(os.path.expanduser("~"), ".hermes")
+    return os.path.join(os.path.expanduser("~"), ".kubot")
 
 
 def _resolved_home() -> str:
-    return os.environ.get("HERMES_HOME", "").strip() or _default_home()
+    return os.environ.get("KUBOT_HOME", os.environ.get("HERMES_HOME", "")).strip() or _default_home()
 
 
 def container_mode_may_be_active() -> bool:
