@@ -38,7 +38,10 @@ def packaged_webapp_dist() -> Path | None:
 
 
 def webapp_dist_dir(project_root: Path) -> Path:
-    return packaged_webapp_dist() or project_root / "apps" / "desktop" / "dist-webapp"
+    value = packaged_webapp_dist()
+    if value and (value / "index.html").is_file():
+        return value
+    return project_root / "kubot_cli" / "web_dist"
 
 
 def mark_webapp_stale(project_root: Path) -> bool:
@@ -106,6 +109,8 @@ def prepare_webapp_renderer(
 
     project_root = project_root.resolve()
     dist = webapp_dist_dir(project_root)
+    if (dist / "index.html").is_file() and not force:
+        return dist
     if packaged_webapp_dist() is not None:
         # The packager built it into a read-only store; there is nothing here to rebuild.
         if not (dist / "index.html").is_file():
