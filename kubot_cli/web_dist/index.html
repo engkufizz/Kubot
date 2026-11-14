@@ -1292,21 +1292,32 @@ kubot logs -f              # Follow agent.log in real time</div>
       stream.scrollTop = stream.scrollHeight;
 
       try {
-        // Try live API query
+        // Send to live agent backend
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: apiHeaders(),
-          body: JSON.stringify({ query: text })
+          body: JSON.stringify({
+            message: text,
+            query: text,
+            session_id: window.__KUBOT_CURRENT_SESSION_ID__ || null
+          })
         });
         if (res.ok) {
           const data = await res.json();
-          typingDiv.querySelector('.chat-bubble').innerHTML = formatMarkdown(data.response || data.text || 'Done.');
+          const replyText = data.reply || data.response || data.text || data.message || 'Done.';
+          typingDiv.querySelector('.chat-bubble').innerHTML = formatMarkdown(replyText);
+          if (data.session_id) {
+            window.__KUBOT_CURRENT_SESSION_ID__ = data.session_id;
+            const badge = document.getElementById('badge-sessions');
+            if (badge) badge.textContent = '1 session active';
+          }
         } else {
-          // Pure fallback response
-          typingDiv.querySelector('.chat-bubble').innerHTML = formatMarkdown(generateAgentReply(text));
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.detail || errData.reply || errData.error || 'Server returned error ' + res.status;
+          typingDiv.querySelector('.chat-bubble').innerHTML = `<span style="color:var(--destructive);">Error: ${formatMarkdown(errMsg)}</span>`;
         }
       } catch (err) {
-        typingDiv.querySelector('.chat-bubble').innerHTML = formatMarkdown(generateAgentReply(text));
+        typingDiv.querySelector('.chat-bubble').innerHTML = `<span style="color:var(--destructive);">Connection error: ${err.message}</span>`;
       }
       stream.scrollTop = stream.scrollHeight;
     }

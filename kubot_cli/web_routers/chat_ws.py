@@ -762,47 +762,76 @@ async def events_ws(ws: WebSocket) -> None:
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: Optional[str] = None
+    query: Optional[str] = None
+    prompt: Optional[str] = None
     session_id: Optional[str] = None
     model: Optional[str] = None
+    profile: Optional[str] = None
 
 
 @router.post("/api/chat")
 async def chat_endpoint(body: ChatRequest, request: Request):
     """Run an agent conversation turn via pure-Python REST."""
-    message = body.message.strip()
+    message = (body.message or body.query or body.prompt or "").strip()
+    profile = (body.profile or request.query_params.get("profile") or "").strip() or None
     if not message:
-        return {"status": "error", "reply": "Empty message", "session_id": body.session_id or "default"}
+        return {"status": "error", "reply": "Empty message", "response": "Empty message", "session_id": body.session_id or "default"}
 
     if message.startswith("/"):
         try:
             from kubot_cli.console_engine import HermesConsoleEngine
-            engine = HermesConsoleEngine()
-            result = await asyncio.to_thread(engine.execute, message.lstrip("/"))
-            return {
-                "status": "ok",
-                "reply": result.output or f"Command executed with status: {result.status}",
-                "session_id": body.session_id or "default",
-            }
+            from kubot_cli.web_server_profiles import _config_profile_scope
+            with _config_profile_scope(profile):
+                engine = HermesConsoleEngine()
+                result = await asyncio.to_thread(engine.execute, message.lstrip("/"))
+                out = result.output or f"Command executed with status: {result.status}"
+                return {
+                    "status": "ok",
+                    "reply": out,
+                    "response": out,
+                    "session_id": body.session_id or "default",
+                }
         except Exception as exc:
             return {
                 "status": "error",
                 "reply": f"Command error: {exc}",
+                "response": f"Command error: {exc}",
                 "session_id": body.session_id or "default",
             }
 
     try:
         from run_agent import AIAgent
-        agent = AIAgent()
-        response = await asyncio.to_thread(agent.run_conversation, message)
+        from kubot_cli.web_server_profiles import _config_profile_scope
+
+        def _run_turn():
+            with _config_profile_scope(profile):
+                from kubot_cli.config import load_config
+                cfg = load_config()
+                chosen_model = body.model or (cfg.get("model") or {}).get("default") or "deepseek-flash"
+                if chosen_model in ("deepseek/deepseek-chat", "deepseek-chat"):
+                    chosen_model = "deepseek-flash"
+                agent_kwargs = {"session_id": body.session_id} if body.session_id else {}
+                agent = AIAgent(model=chosen_model, **agent_kwargs)
+                res = agent.run_conversation(message)
+                sid = getattr(agent, "session_id", body.session_id or "default")
+                if isinstance(res, dict):
+                    final_text = res.get("final_response") or res.get("output") or res.get("response") or str(res)
+                else:
+                    final_text = str(res) if res else "(No response)"
+                return final_text, sid
+
+        response_text, sid = await asyncio.to_thread(_run_turn)
         return {
             "status": "ok",
-            "reply": str(response) if response else "(No response)",
-            "session_id": getattr(agent, "session_id", body.session_id or "default"),
+            "reply": response_text,
+            "response": response_text,
+            "session_id": sid,
         }
     except Exception as exc:
         return {
             "status": "error",
             "reply": f"Agent error: {exc}",
+            "response": f"Agent error: {exc}",
             "session_id": body.session_id or "default",
         }
