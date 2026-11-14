@@ -7,7 +7,7 @@ description: "Create a provisional Live2D character from a brief with complete i
 maintainer: flabanabba8
 tier: community
 category: tools
-requires_hermes: ">=0.22.3"
+requires_kubot: ">=0.22.3"
 docs_url: https://github.com/flabanabba8/live2d-rigger/blob/f13a5af37c3322b8de5fca6d193ab20ec46189b8/README.md
 image: https://raw.githubusercontent.com/flabanabba8/live2d-rigger/f13a5af37c3322b8de5fca6d193ab20ec46189b8/assets/thumbnail.jpg
 platforms:

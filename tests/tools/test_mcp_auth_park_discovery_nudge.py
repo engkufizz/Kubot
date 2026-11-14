@@ -10,7 +10,7 @@ import pytest
 
 @pytest.mark.no_isolate
 def test_auth_parked_oauth_server_ignores_discovery_until_credentials_change(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
     from tools import mcp_tool
     from tools.mcp_oauth import HermesTokenStorage, OAuthNonInteractiveError
     from tools.mcp_tool import MCPServerTask
@@ -47,7 +47,7 @@ def test_auth_parked_oauth_server_ignores_discovery_until_credentials_change(mon
         assert len(attempts) == 1
 
         token_file.write_text(json.dumps({"access_token": "b", "token_type": "Bearer", "refresh_token": "new"}))
-        _select_new_servers({"cloud": cfg})  # `hermes mcp login` landed: the next pass revives it
+        _select_new_servers({"cloud": cfg})  # `kubot mcp login` landed: the next pass revives it
         await _settle()
         assert len(attempts) == 2
 

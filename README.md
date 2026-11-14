@@ -82,8 +82,8 @@ kubot chat -q "/goal create a clean python web scraper with tests"
 ## Directory Structure
 
 - `~/.kubot/`: Default configuration directory containing `config.yaml`, session state databases, and custom skills.
-- `hermes_cli/`: Core Python CLI, console engine, and web server routers.
-- `hermes_cli/web_dist/`: Pure-Python zero-node web application assets.
+- `kubot_cli/`: Core Python CLI, console engine, and web server routers.
+- `kubot_cli/web_dist/`: Pure-Python zero-node web application assets.
 - `agent/`: Conversation loop, tool dispatch, and prompt engineering.
 - `tools/`: Built-in execution, file operations, search, and skills tools.
 

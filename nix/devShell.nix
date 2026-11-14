@@ -11,7 +11,7 @@
     { pkgs, lib, self', ... }:
     let
       packages = builtins.attrValues self'.packages;
-      hermesNpmLib = self'.packages.default.passthru.hermesNpmLib;
+      hermesNpmLib = self'.packages.default.passthru.kubotNpmLib;
 
       # Collect all packageJsonPath values from pnpm workspace packages.
       npmPackageJsonPaths = builtins.filter (p: p != null) (
@@ -43,7 +43,7 @@
         ++ self'.packages.default.passthru.devDeps;
         shellHook = ''
           # The editable venv's .pth resolves the checkout through this.
-          export HERMES_PYTHON_SRC_ROOT=$(git rev-parse --show-toplevel)
+          export KUBOT_PYTHON_SRC_ROOT=$(git rev-parse --show-toplevel)
 
           ${hermesAgentDevShellHook}
           ${hermesNpmLib.mkPnpmDevShellHook npmPackageJsonPaths}
@@ -57,8 +57,8 @@
           export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
           export NIX_SSL_CERT_FILE="$SSL_CERT_FILE"
 
-          echo "Hermes Agent dev shell in $HERMES_PYTHON_SRC_ROOT"
-          echo "Ready. 'hermes-checkout' runs this checkout; 'hermes' stays your installed Hermes."
+          echo "Kubot Agent dev shell in $KUBOT_PYTHON_SRC_ROOT"
+          echo "Ready. 'kubot-checkout' runs this checkout; 'kubot' stays your installed Kubot."
         '';
       };
     };

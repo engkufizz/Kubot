@@ -11,12 +11,12 @@ sandbox = tempfile.TemporaryDirectory(prefix="hermes-104260-")
 os.environ.clear()
 os.environ.update(
     HOME=sandbox.name,
-    HERMES_HOME=sandbox.name + "/hermes",
+    KUBOT_HOME=sandbox.name + "/kubot",
     PATH="/usr/bin:/bin",
     PYTHONDONTWRITEBYTECODE="1",
-    HERMES_DISABLE_MODEL_METADATA_FETCH="1",
+    KUBOT_DISABLE_MODEL_METADATA_FETCH="1",
 )
-Path(os.environ["HERMES_HOME"]).mkdir()
+Path(os.environ["KUBOT_HOME"]).mkdir()
 os.chdir(sandbox.name)
 sys.path.insert(0, REPO)
 import socket
@@ -126,8 +126,8 @@ config = {
         }
     },
 }
-# JSON is valid YAML; only the temporary Hermes home is written.
-Path(os.environ["HERMES_HOME"], "config.yaml").write_text(
+# JSON is valid YAML; only the temporary Kubot home is written.
+Path(os.environ["KUBOT_HOME"], "config.yaml").write_text(
     json.dumps(config), encoding="utf-8"
 )
 from agent import auxiliary_client as aux

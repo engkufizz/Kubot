@@ -24,7 +24,7 @@ def _pactl(*args: str, check: bool) -> subprocess.CompletedProcess:
 class AudioBridge:
     """Virtual audio device for Chrome fake-mic input: ``setup()`` before launch, ``teardown()`` after."""
 
-    def __init__(self, name_prefix: str = "hermes_meet") -> None:
+    def __init__(self, name_prefix: str = "kubot_meet") -> None:
         self._name_prefix = name_prefix
         self._platform: Optional[str] = None
         self._device_name: Optional[str] = None

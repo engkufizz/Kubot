@@ -55,5 +55,4 @@ anthropic = [
 ]
 
 [project.scripts]
-kubot = "hermes_cli.main:main"
-hermes = "hermes_cli.main:main"
+kubot = "kubot_cli.main:main"

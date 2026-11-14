@@ -8,7 +8,7 @@ import pytest
 
 @pytest.fixture()
 def roster(monkeypatch, tmp_path):
-    from hermes_state import SessionDB
+    from kubot_state import SessionDB
     from tools import delegate_tool_registry as reg
     from tui_gateway import server
 

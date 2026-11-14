@@ -12,10 +12,10 @@ ENV_KEY = "sk-openai-env-secret"
 
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    (hermes_home / "config.yaml").write_text("model:\n  default: test-model\n")
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    kubot_home = tmp_path / ".kubot"
+    kubot_home.mkdir()
+    (kubot_home / "config.yaml").write_text("model:\n  default: test-model\n")
+    monkeypatch.setenv("KUBOT_HOME", str(kubot_home))
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", ENV_KEY)
 

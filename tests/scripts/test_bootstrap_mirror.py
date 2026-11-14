@@ -83,7 +83,7 @@ def test_windows_bootstrap_rejects_corrupt_bytes_before_extract(tmp_path, server
     script = tmp_path / "caller.ps1"
     script.write_text(
         f". '{ROOT / 'scripts/install.ps1'}' -HermesHome '{tmp_path / 'home'}'\n"
-        f"$env:HERMES_RUNTIME_DIR = '{tmp_path / 'tools'}'\n"
+        f"$env:KUBOT_RUNTIME_DIR = '{tmp_path / 'tools'}'\n"
         "function Get-Command { param($Name) return $null }\n"
         "$target = 'win32-' + (Get-WindowsArch)\n"
         f"$pin = @{{Url='{primary}'; MirrorUrl='{mirror}'; Sha256='{digest}'}}\n"
@@ -120,7 +120,7 @@ command() {{ if [ "$*" = '-v uv' ]; then return 1; fi; builtin command "$@"; }}
 uv_bootstrap_pin() {{ UV_PIN_VERSION=fixture; UV_PIN_URL='{primary}'; UV_PIN_MIRROR='{mirror}'; UV_PIN_SHA256='{digest}'; }}
 ensure_uv
 """
-    env = {**os.environ, "HERMES_HOME": str(tmp_path / "home"), "HOME": str(tmp_path / "home"), "HERMES_RUNTIME_DIR": str(tmp_path / "tools")}
+    env = {**os.environ, "KUBOT_HOME": str(tmp_path / "home"), "HOME": str(tmp_path / "home"), "KUBOT_RUNTIME_DIR": str(tmp_path / "tools")}
     result = subprocess.run(["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True, timeout=60, check=False)
     assert (result.returncode == 0) == (mode in ("primary", "missing")), result.stdout + result.stderr
     if mode == "corrupt":
@@ -159,13 +159,13 @@ def test_dev_setup_reaches_the_same_mirror_without_python(tmp_path, server):
     http.files["/archive/" + digest] = body
     repo = tmp_path / "repo"
     (repo / "pm").mkdir(parents=True)
-    shutil.copyfile(ROOT / "setup-hermes.sh", repo / "setup-hermes.sh")
+    shutil.copyfile(ROOT / "setup-kubot.sh", repo / "setup-kubot.sh")
     (repo / "pm/artifact-mirror.json").write_text(json.dumps({"origin": base, "prefix": "archive/"}, indent=2), encoding="utf-8")
     (repo / "pm/lock.json").write_text(json.dumps({"packages": {
         "uv": {"version": "fixture", "artifacts": {current_target(): {"url": base + "/missing.tar.gz", "sha256": digest}}},
         "python": {"version": "3.14.7"},
     }}, indent=2, sort_keys=True), encoding="utf-8")
-    env = {**os.environ, "HERMES_HOME": str(tmp_path / "home"), "HOME": str(tmp_path / "home"), "HERMES_RUNTIME_DIR": str(tmp_path / "tools")}
-    result = subprocess.run(["bash", str(repo / "setup-hermes.sh")], cwd=repo, env=env, text=True, capture_output=True, timeout=60, check=False)
+    env = {**os.environ, "KUBOT_HOME": str(tmp_path / "home"), "HOME": str(tmp_path / "home"), "KUBOT_RUNTIME_DIR": str(tmp_path / "tools")}
+    result = subprocess.run(["bash", str(repo / "setup-kubot.sh")], cwd=repo, env=env, text=True, capture_output=True, timeout=60, check=False)
     assert result.returncode == 73, result.stdout + result.stderr  # stop at the bootstrap interpreter boundary
     assert http.requests == ["/missing.tar.gz", "/archive/" + digest]

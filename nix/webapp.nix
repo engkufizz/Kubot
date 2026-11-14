@@ -16,7 +16,7 @@ hermesNpmLib.buildPnpmPackage {
     "scripts/build/freshness.mjs"
     "scripts/build/frontend-common.mjs"
   ];
-  pname = "hermes-webapp";
+  pname = "kubot-webapp";
 
   doCheck = false;
 

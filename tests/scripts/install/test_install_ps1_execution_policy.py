@@ -16,13 +16,13 @@ import sys
 
 import pytest
 
-from hermes_cli._launchers import runtime_command
+from kubot_cli._launchers import runtime_command
 
 pytestmark = pytest.mark.platforms("windows")
 INSTALLER = Path(__file__).resolve().parents[3] / "scripts" / "install.ps1"
 
 
-def test_installed_hermes_runs_under_restricted_policy(tmp_path):
+def test_installed_kubot_runs_under_restricted_policy(tmp_path):
     powershell = shutil.which("powershell")
     assert powershell
     helper = tmp_path / "install" / "scripts" / "desktop-update" / "runtime.ps1"
@@ -49,23 +49,23 @@ def test_installer_runs_runtime_command_from_apostrophe_account_path(tmp_path):
     """A Windows account apostrophe must survive launcher JSON -> PowerShell -> Python -c."""
     powershell = shutil.which("powershell")
     assert powershell
-    install_root = tmp_path / "O'Brien" / "hermes-agent"
+    install_root = tmp_path / "O'Brien" / "kubot-agent"
     helper = install_root / "scripts" / "desktop-update" / "runtime.ps1"
     helper.parent.mkdir(parents=True)
-    (install_root / "hermes_bootstrap.py").write_text("", encoding="utf-8")
+    (install_root / "kubot_bootstrap.py").write_text("", encoding="utf-8")
     helper.write_text(
         "function Get-HermesRuntimeCommand([string]$InstallRoot) {\n"
-        "    $items = $env:HERMES_TEST_RUNTIME_COMMAND | ConvertFrom-Json\n"
+        "    $items = $env:KUBOT_TEST_RUNTIME_COMMAND | ConvertFrom-Json\n"
         "    foreach ($item in $items) { Write-Output $item }\n"
         "}\n",
         encoding="utf-8",
     )
     selected = runtime_command(
         install_root, code="print('setup-runtime-ok')", python=sys.executable,
-        home=install_root.parent / ".hermes",
+        home=install_root.parent / ".kubot",
     )
     env = os.environ.copy()
-    env["HERMES_TEST_RUNTIME_COMMAND"] = json.dumps(selected)
+    env["KUBOT_TEST_RUNTIME_COMMAND"] = json.dumps(selected)
     quoted_installer = str(INSTALLER).replace("'", "''")
     quoted_root = str(install_root).replace("'", "''")
     command = (f". '{quoted_installer}'; "

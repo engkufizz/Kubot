@@ -3,11 +3,11 @@ title: Ember Radar
 repo: https://github.com/sicutdeusvult/ember-radar
 sha: 36299e76b6db93867db7d08a3ed041d3289d572a
 version: "0.1.0"
-description: "Ember, the Solana launchpad where every coin is paired with a tokenized stock or a blue chip and its fees go to holders, burns, a lotto or a trader, inside Hermes: ten read-only tools (discover coins, a coin's whole card, holders, trades, fee payouts, the live tape, the fomode traders board, the stock pairs), a per-profile watchlist whose notable moves Hermes whispers at the start of a turn, /ember in any session, an Ember daily-brief Automation Blueprint and two research skills. No keys, no wallet: HTTPS reads of embercurve.fun's public API, the watchlist in the plugin's own data dir."
+description: "Ember, the Solana launchpad where every coin is paired with a tokenized stock or a blue chip and its fees go to holders, burns, a lotto or a trader, inside Kubot: ten read-only tools (discover coins, a coin's whole card, holders, trades, fee payouts, the live tape, the fomode traders board, the stock pairs), a per-profile watchlist whose notable moves Kubot whispers at the start of a turn, /ember in any session, an Ember daily-brief Automation Blueprint and two research skills. No keys, no wallet: HTTPS reads of embercurve.fun's public API, the watchlist in the plugin's own data dir."
 maintainer: sicutdeusvult
 tier: community
 category: tools
-requires_hermes: ">=0.22.6"
+requires_kubot: ">=0.22.6"
 docs_url: https://github.com/sicutdeusvult/ember-radar#readme
 image: https://raw.githubusercontent.com/sicutdeusvult/ember-radar/36299e76b6db93867db7d08a3ed041d3289d572a/docs/banner.png
 screenshots:

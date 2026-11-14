@@ -101,20 +101,20 @@ RULES: tuple[Rule, ...] = (
     Rule("HX009", "isinstance(r, Exception) on gather results", "check `BaseException`:"
          " `gather(return_exceptions=True)` also returns CancelledError", "ast"),
     # Profile scope (one process serves many profiles).
-    Rule("HX001", "hardcoded Hermes home", "`get_hermes_home()` for paths,"
-         " `display_hermes_home()` for user-facing text (`hermes_constants`); a path that"
+    Rule("HX001", "hardcoded Kubot home", "`get_kubot_home()` for paths,"
+         " `display_kubot_home()` for user-facing text (`kubot_constants`); a path that"
          " deliberately lives under the user's home, not the profile (e.g. the profiles root),"
          " takes `# health: allow HX001 -- <why>`", "ast",
          blocking=WARN_UNTIL_REPLAYED,
-         exclude=SINGLE_PROFILE + ("hermes_constants.py",)),
-    Rule("HX002", "new HERMES_* environment variable", "behavioural settings go in"
+         exclude=SINGLE_PROFILE + ("kubot_constants.py",)),
+    Rule("HX002", "new KUBOT_* environment variable", "behavioural settings go in"
          " config.yaml, secrets through the secret scope; `.env` is for credentials only",
          "ast", exclude=SINGLE_PROFILE),
     Rule("HX004", "UnscopedSecretError falls back to os.getenv", "bind the owning profile's"
          " secret scope at the spawn site; never read the launch profile's environment",
          "ast", exclude=SINGLE_PROFILE),
     Rule("HX005", "home/config/env captured at import time", "resolve it at call time"
-         " (`get_hermes_home()`, `load_config()`) or key the slot by `hermes_home_key()`;"
+         " (`get_kubot_home()`, `load_config()`) or key the slot by `kubot_home_key()`;"
          " module constants hold the launch profile's value", "ast",
          exclude=SINGLE_PROFILE),
     Rule("HX012", "raw threading.Thread", "`spawn_context_thread(...)` so the thread keeps"
@@ -130,15 +130,15 @@ RULES: tuple[Rule, ...] = (
     Rule("HX016", "legacy profile setter", "bind a scope:"
          " `agent.runtime_scope.bind_profile_scope(home)` moves home, secrets and terminal policy"
          " together (`bind_turn(session_id, turn_id, fence)` inside it for a turn); `bind_state(scope, ...)` for a host"
-         " that binds less on purpose. A raw `set_hermes_home_override` / `set_secret_scope` /"
+         " that binds less on purpose. A raw `set_kubot_home_override` / `set_secret_scope` /"
          " `set_terminal_scope` / `install_profile_terminal_scope` call blocks only when it is new: an"
          " existing call stays until someone migrates it", "ast",
-         exclude=SINGLE_PROFILE + ("agent/runtime_scope.py", "hermes_constants.py",
+         exclude=SINGLE_PROFILE + ("agent/runtime_scope.py", "kubot_constants.py",
                                    "agent/secret_scope.py", "tools/terminal_scope.py")),
     # Process identity.
     Rule("HX003", "process identity from argv substrings", "use"
          " `gateway.status.looks_like_gateway_command_line` /"
-         " `hermes_cli.update_cmd._hermes_holder_subcommand` and match full cmdlines", "ast",
+         " `kubot_cli.update_cmd._kubot_holder_subcommand` and match full cmdlines", "ast",
          blocking=WARN_UNTIL_REPLAYED),
     # Config truthiness.
     Rule("HX010", "bool() of a config/env string", "`bool(\"false\")` is True. Is it set?"
@@ -149,9 +149,9 @@ RULES: tuple[Rule, ...] = (
     Rule("HX011", "if/elif ladder on one name", "use a dict/table -> handler (`_SLASH_DISPATCH`"
          " is the shape)", "ast", exclude=()),
     # Session store: an fd the lock-safety registry cannot see (closing any raw fd on the file
-    # cancels the process's POSIX locks on it; see `_HEADER_PROBE_FDS` in hermes_state_dbfile.py).
+    # cancels the process's POSIX locks on it; see `_HEADER_PROBE_FDS` in kubot_state_dbfile.py).
     Rule("HX015", "untracked sqlite3.connect on state.db", "open it with"
-         " `hermes_cli.sqlite_safe_read.connect_tracked(..., tracking_path=<the db path>)`"
+         " `kubot_cli.sqlite_safe_read.connect_tracked(..., tracking_path=<the db path>)`"
          " so `has_live_connection()` / `offline_file_access()` see the fd; a deliberately offline"
          " file (snapshot, scratch copy, quarantined file) takes `# health: allow HX015 -- <why>`",
          "ast", blocking=WARN_UNTIL_REPLAYED, exclude=TESTS + ("evals/*",)),

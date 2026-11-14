@@ -4,30 +4,30 @@ import threading
 
 import pytest
 
-from hermes_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+from kubot_constants import get_kubot_home, reset_kubot_home_override, set_kubot_home_override
 
 
 @pytest.fixture
 def profile_b(tmp_path, monkeypatch):
     from tui_gateway import server
-    monkeypatch.setenv("HERMES_VOICE_TTS", "1")
+    monkeypatch.setenv("KUBOT_VOICE_TTS", "1")
     monkeypatch.setattr(server, "_arm_barge_listener_if_enabled", lambda: None)
     home = tmp_path / "profiles" / "b"
     home.mkdir(parents=True)
-    token = set_hermes_home_override(str(home))
+    token = set_kubot_home_override(str(home))
     try:
         yield home
     finally:
-        reset_hermes_home_override(token)
+        reset_kubot_home_override(token)
 
 
 def _speaker(monkeypatch):
     """Replace the real speaker with one that records the home it runs under."""
-    from hermes_cli import voice
+    from kubot_cli import voice
     seen, done = {}, threading.Event()
 
     def speak_text(text, stop_event=None):
-        seen["home"] = get_hermes_home()
+        seen["home"] = get_kubot_home()
         done.set()
     monkeypatch.setattr(voice, "speak_text", speak_text)
     return seen, done
@@ -57,8 +57,8 @@ def test_voice_tts_rpc_speaks_as_the_requested_profile(tmp_path, monkeypatch):
     launch, worker = tmp_path / "launch", tmp_path / "profiles" / "b"
     launch.mkdir()
     worker.mkdir(parents=True)
-    monkeypatch.setattr(server, "_hermes_home", launch)
-    monkeypatch.setenv("HERMES_HOME", str(launch))
+    monkeypatch.setattr(server, "_kubot_home", launch)
+    monkeypatch.setenv("KUBOT_HOME", str(launch))
     monkeypatch.setattr(server, "_profile_home", lambda name: worker if name == "b" else None)
     monkeypatch.setattr(server, "_arm_barge_listener_if_enabled", lambda: None)
     for params, expected in (({"text": "hi", "profile": "b"}, worker), ({"text": "hi"}, launch)):

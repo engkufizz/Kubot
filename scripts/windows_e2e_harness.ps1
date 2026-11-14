@@ -25,7 +25,7 @@ foreach ($m in @("desktop-installer@latest", "installer-script", "installer-scri
     if ($imSet -notcontains $m) { Write-Host "InstallMethod ValidateSet missing $m"; exit 1 }
 }
 $rSet = ($byName["Route"].Attributes | Where-Object { $_.TypeName.Name -eq "ValidateSet" }).PositionalArguments.Value
-foreach ($m in @("open-app-update", "hermes-desktop-app-update", "hermes-update", "installer-script", "installer-script+desktop", "desktop-installer@latest")) {
+foreach ($m in @("open-app-update", "kubot-desktop-app-update", "kubot-update", "installer-script", "installer-script+desktop", "desktop-installer@latest")) {
     if ($rSet -notcontains $m) { Write-Host "Route ValidateSet missing $m"; exit 1 }
 }
 Write-Host "parameter surface: OK"

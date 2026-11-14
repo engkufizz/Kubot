@@ -1,4 +1,4 @@
-"""Metadata documents whose issuer the SDK's exact-string check (RFC 8414 §3.3) refuses but Hermes accepts.
+"""Metadata documents whose issuer the SDK's exact-string check (RFC 8414 §3.3) refuses but Kubot accepts.
 
 Strava's MCP connector advertises ``authorization_servers: ["https://www.strava.com/mcp-issuer"]`` and
 serves ``/.well-known/oauth-authorization-server/mcp-issuer`` with ``issuer: "https://www.strava.com"``
@@ -45,7 +45,7 @@ async def test_origin_issued_metadata_shim_does_not_read_non_discovery_response(
     provider = HermesProviderMixin.__new__(HermesProviderMixin)
     response = ResourceResponse()
 
-    assert await provider._hermes_accept_origin_issued_metadata(response) is response
+    assert await provider._kubot_accept_origin_issued_metadata(response) is response
 
 
 def _asm(issuer):
@@ -86,11 +86,11 @@ async def _run_flow(tmp_path, monkeypatch, issuer_doc, advertised=ADVERTISED, is
     from pydantic import AnyUrl
 
     from tools.mcp_oauth import HermesTokenStorage, _authorization_code_result
-    from tools.mcp_oauth_manager import _HERMES_PROVIDER_CLS, reset_manager_for_tests
+    from tools.mcp_oauth_manager import _KUBOT_PROVIDER_CLS, reset_manager_for_tests
     from tools.mcp_tool import sdk_httpx
 
     httpx = sdk_httpx()
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
     reset_manager_for_tests()
     seen = {}
 
@@ -102,9 +102,9 @@ async def _run_flow(tmp_path, monkeypatch, issuer_doc, advertised=ADVERTISED, is
         return _authorization_code_result("code-1", seen["state"], iss=iss)
 
     storage = HermesTokenStorage("srv")
-    provider = _HERMES_PROVIDER_CLS(
+    provider = _KUBOT_PROVIDER_CLS(
         server_name="srv", server_url=RESOURCE, storage=storage,
-        client_metadata=OAuthClientMetadata(redirect_uris=[AnyUrl("http://127.0.0.1:1/cb")], client_name="Hermes Agent"),
+        client_metadata=OAuthClientMetadata(redirect_uris=[AnyUrl("http://127.0.0.1:1/cb")], client_name="Kubot Agent"),
         redirect_handler=redirect, callback_handler=callback)
     standin = _StandIn(httpx, issuer_doc, advertised)
     async with httpx.AsyncClient(auth=provider, transport=httpx.MockTransport(standin)) as client:
@@ -176,5 +176,5 @@ async def test_issuer_equal_to_the_advertised_identifier_is_left_to_the_sdk():
     request = httpx.Request("GET", f"{AS_ORIGIN}/.well-known/oauth-authorization-server")
     response = httpx.Response(200, json=_asm(f"{AS_ORIGIN}/"), request=request)
 
-    assert await provider._hermes_accept_origin_issued_metadata(response) is response
+    assert await provider._kubot_accept_origin_issued_metadata(response) is response
     assert provider.context.oauth_metadata is None

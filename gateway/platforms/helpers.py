@@ -339,8 +339,8 @@ class ThreadParticipationTracker:
         self._threads: dict[str, None] = dict.fromkeys(str(t) for t in self._load())
 
     def _state_path(self) -> Path:
-        from hermes_constants import get_hermes_home
-        return get_hermes_home() / f"{self._platform}_threads.json"
+        from kubot_constants import get_kubot_home
+        return get_kubot_home() / f"{self._platform}_threads.json"
 
     def _load(self) -> list[str]:
         try:
@@ -529,7 +529,7 @@ def bypasses_chat_order(text: Any) -> bool:
     flight, so it skips :class:`ChatOrderedWork`'s per-chat wait and never waits on an earlier voice
     note's gate STT. Every other command (``/new``, ``/undo``, ``/status``) keeps its place behind it."""
     from gateway.session_commands import _ESCAPE_HATCHES
-    from hermes_cli.commands import resolve_command
+    from kubot_cli.commands import resolve_command
     head = str(text or "").lstrip().split(maxsplit=1)
     if not head or not head[0].startswith("/"):
         return False
@@ -1119,7 +1119,7 @@ async def send_reply_as_file(adapter: Any, chat_id: str, text: str, *, reply_to:
         return None
     parts = reply_file_parts(text, int(getattr(adapter, "REPLY_FILE_MAX_BYTES", 8 * 1024 * 1024)))
     stem, ids = f"reply-{secrets.token_hex(4)}", []
-    folder = await asyncio.to_thread(tempfile.mkdtemp, prefix="hermes-reply-")
+    folder = await asyncio.to_thread(tempfile.mkdtemp, prefix="kubot-reply-")
     try:
         for index, part in enumerate(parts, 1):
             name = f"{stem}.md" if len(parts) == 1 else f"{stem}-{index}.md"
@@ -1192,7 +1192,7 @@ async def _file_result(adapter: Any, chat_id: str, content: str, reply_to: Optio
 # (``adapter.send`` per preview, seal and tail) and counts them itself, so no piece is filed on its own;
 # and once a reply's upload failed, its message fallback must not try the upload again. A complete
 # message the consumer sends (commentary) opts back in with ``reply_file_off(False)``.
-_REPLY_FILE_OFF: contextvars.ContextVar[bool] = contextvars.ContextVar("hermes_reply_file_off", default=False)
+_REPLY_FILE_OFF: contextvars.ContextVar[bool] = contextvars.ContextVar("kubot_reply_file_off", default=False)
 
 
 @contextlib.contextmanager

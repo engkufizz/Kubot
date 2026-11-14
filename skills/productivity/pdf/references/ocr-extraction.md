@@ -52,29 +52,29 @@ If the user needs marker capabilities but the system lacks ~5GB free disk:
 ## pymupdf (lightweight)
 
 Give it a separate side environment (~110 MB with its deps; never
-`pip install` into Hermes's own interpreter): Hermes builds it when `hermes`
-is on PATH, otherwise (a Docker sandbox without Hermes) a venv in the sandbox
+`pip install` into Kubot's own interpreter): Kubot builds it when `kubot`
+is on PATH, otherwise (a Docker sandbox without Kubot) a venv in the sandbox
 home takes the same requirements. Then run the helper and the inline snippet
 below with `"$PY"` instead of `python`:
 
 ```bash
-if command -v hermes >/dev/null 2>&1; then
-  PY="$(hermes pm environment pdf-pymupdf --requirement 'pymupdf>=1.26,<3' --requirement 'pymupdf4llm>=0.2,<3')"
+if command -v kubot >/dev/null 2>&1; then
+  PY="$(kubot pm environment pdf-pymupdf --requirement 'pymupdf>=1.26,<3' --requirement 'pymupdf4llm>=0.2,<3')"
 else
-  PY="$HOME/.cache/hermes-pdf-pymupdf-venv/bin/python"
+  PY="$HOME/.cache/kubot-pdf-pymupdf-venv/bin/python"
   "$PY" -c "import pymupdf, pymupdf4llm" 2>/dev/null || (
     # concurrency-safe build: see the documents block in SKILL.md
-    mkdir -p "$HOME/.cache" && cd "$HOME/.cache" && stage="$(mktemp -d hermes-pdf-pymupdf-venv.XXXXXX)" || exit 1
-    old="$(readlink hermes-pdf-pymupdf-venv)"  # the published build, if any (another agent may have just published it)
+    mkdir -p "$HOME/.cache" && cd "$HOME/.cache" && stage="$(mktemp -d kubot-pdf-pymupdf-venv.XXXXXX)" || exit 1
+    old="$(readlink kubot-pdf-pymupdf-venv)"  # the published build, if any (another agent may have just published it)
     python3 -m venv "$stage" &&
       "$stage/bin/python" -m pip install -q --disable-pip-version-check 'pymupdf>=1.26,<3' 'pymupdf4llm>=0.2,<3' &&
       "$stage/bin/python" -c "import pymupdf, pymupdf4llm" &&
-      if [ -z "$old" ]; then python3 -c 'import os, sys; os.symlink(*sys.argv[1:])' "$stage" hermes-pdf-pymupdf-venv
-      elif [ "$(readlink hermes-pdf-pymupdf-venv)" = "$old" ] && ! "$old/bin/python" -c "import pymupdf, pymupdf4llm" 2>/dev/null; then
-        ln -s "$stage" "$stage.lnk" && python3 -c 'import os, sys; os.replace(*sys.argv[1:])' "$stage.lnk" hermes-pdf-pymupdf-venv &&
-          case "$old" in hermes-pdf-pymupdf-venv.??????) rm -rf "$old" ;; esac
+      if [ -z "$old" ]; then python3 -c 'import os, sys; os.symlink(*sys.argv[1:])' "$stage" kubot-pdf-pymupdf-venv
+      elif [ "$(readlink kubot-pdf-pymupdf-venv)" = "$old" ] && ! "$old/bin/python" -c "import pymupdf, pymupdf4llm" 2>/dev/null; then
+        ln -s "$stage" "$stage.lnk" && python3 -c 'import os, sys; os.replace(*sys.argv[1:])' "$stage.lnk" kubot-pdf-pymupdf-venv &&
+          case "$old" in kubot-pdf-pymupdf-venv.??????) rm -rf "$old" ;; esac
       fi 2>/dev/null
-    [ "$(readlink hermes-pdf-pymupdf-venv)" = "$stage" ] || rm -rf "$stage" "$stage.lnk"
+    [ "$(readlink kubot-pdf-pymupdf-venv)" = "$stage" ] || rm -rf "$stage" "$stage.lnk"
   )
 fi
 export PY
@@ -109,23 +109,23 @@ for page in doc:
 python scripts/extract_marker.py --check
 
 # its own side environment (PyTorch + models); run the helper with "$PY"
-if command -v hermes >/dev/null 2>&1; then
-  PY="$(hermes pm environment pdf-marker --requirement 'marker-pdf>=1.8,<3')"
+if command -v kubot >/dev/null 2>&1; then
+  PY="$(kubot pm environment pdf-marker --requirement 'marker-pdf>=1.8,<3')"
 else
-  PY="$HOME/.cache/hermes-pdf-marker-venv/bin/python"
+  PY="$HOME/.cache/kubot-pdf-marker-venv/bin/python"
   "$PY" -c "import marker" 2>/dev/null || (
     # concurrency-safe build: see the documents block in SKILL.md
-    mkdir -p "$HOME/.cache" && cd "$HOME/.cache" && stage="$(mktemp -d hermes-pdf-marker-venv.XXXXXX)" || exit 1
-    old="$(readlink hermes-pdf-marker-venv)"  # the published build, if any (another agent may have just published it)
+    mkdir -p "$HOME/.cache" && cd "$HOME/.cache" && stage="$(mktemp -d kubot-pdf-marker-venv.XXXXXX)" || exit 1
+    old="$(readlink kubot-pdf-marker-venv)"  # the published build, if any (another agent may have just published it)
     python3 -m venv "$stage" &&
       "$stage/bin/python" -m pip install -q --disable-pip-version-check 'marker-pdf>=1.8,<3' &&
       "$stage/bin/python" -c "import marker" &&
-      if [ -z "$old" ]; then python3 -c 'import os, sys; os.symlink(*sys.argv[1:])' "$stage" hermes-pdf-marker-venv
-      elif [ "$(readlink hermes-pdf-marker-venv)" = "$old" ] && ! "$old/bin/python" -c "import marker" 2>/dev/null; then
-        ln -s "$stage" "$stage.lnk" && python3 -c 'import os, sys; os.replace(*sys.argv[1:])' "$stage.lnk" hermes-pdf-marker-venv &&
-          case "$old" in hermes-pdf-marker-venv.??????) rm -rf "$old" ;; esac
+      if [ -z "$old" ]; then python3 -c 'import os, sys; os.symlink(*sys.argv[1:])' "$stage" kubot-pdf-marker-venv
+      elif [ "$(readlink kubot-pdf-marker-venv)" = "$old" ] && ! "$old/bin/python" -c "import marker" 2>/dev/null; then
+        ln -s "$stage" "$stage.lnk" && python3 -c 'import os, sys; os.replace(*sys.argv[1:])' "$stage.lnk" kubot-pdf-marker-venv &&
+          case "$old" in kubot-pdf-marker-venv.??????) rm -rf "$old" ;; esac
       fi 2>/dev/null
-    [ "$(readlink hermes-pdf-marker-venv)" = "$stage" ] || rm -rf "$stage" "$stage.lnk"
+    [ "$(readlink kubot-pdf-marker-venv)" = "$stage" ] || rm -rf "$stage" "$stage.lnk"
   )
 fi
 export PY

@@ -100,15 +100,15 @@ class _RecordingConn:
 
 @pytest.fixture
 def acp(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.setenv("HERMES_DISABLE_PLUGINS", "1")
+    monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
+    monkeypatch.setenv("KUBOT_DISABLE_PLUGINS", "1")
     monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
     provider = _LoopbackProvider()
 
     import acp_adapter.session as acp_session
-    import hermes_cli.config as cli_config
-    from hermes_cli import mcp_startup
-    from hermes_cli import runtime_provider
+    import kubot_cli.config as cli_config
+    from kubot_cli import mcp_startup
+    from kubot_cli import runtime_provider
 
     monkeypatch.setattr(cli_config, "load_config", lambda *a, **k: {
         "model": {"provider": "openai-compat", "default": _MODEL, "context_length": 131072},
@@ -123,7 +123,7 @@ def acp(tmp_path, monkeypatch):
 
     from acp_adapter.server import HermesACPAgent, TextContentBlock
     from acp_adapter.session import SessionManager
-    from hermes_state import SessionDB
+    from kubot_state import SessionDB
 
     db_path = tmp_path / "state.db"
     db = SessionDB(db_path)
@@ -157,7 +157,7 @@ def test_acp_refusal_never_poisons_the_next_prompt(acp):
     Invariant: a safety-filter refusal is deterministic for the unchanged conversation (the filter
     judges the whole thread), so the refused turn is dropped from the live history and never rides
     into the next prompt. Otherwise every later message re-refuses and the chat locks up (the
-    "Hermes Bot stuck sessions" report). The refusal still reaches the client live; transient
+    "Kubot Bot stuck sessions" report). The refusal still reaches the client live; transient
     failures keep their close-and-replay path (the server_error / rate_limit / timeout tests below),
     which this does not touch.
     """
@@ -330,9 +330,9 @@ def test_failed_turn_boundary_is_idempotent_on_the_durable_tail_and_skips_contex
 
     from agent.conversation_loop import _close_durable_failed_turn
     from agent.turn_failure_copy import PARTIAL_FAILED_TURN_NOTICE
-    from hermes_state import SessionDB
+    from kubot_state import SessionDB
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
     db = SessionDB(tmp_path / "state.db")
     sid = "s1"
     db.create_session(session_id=sid, source="acp", model="m")
@@ -401,9 +401,9 @@ def test_failed_turn_boundary_keeps_the_error_card_for_rehydration(tmp_path, mon
     from types import SimpleNamespace
 
     from agent.conversation_loop import _close_durable_failed_turn
-    from hermes_state import SessionDB
+    from kubot_state import SessionDB
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
     db = SessionDB(tmp_path / "state.db")
     sid = "s1"
     db.create_session(session_id=sid, source="acp", model="m")
@@ -436,9 +436,9 @@ def test_failed_turn_after_a_tool_row_is_closed_with_its_error_card(tmp_path, mo
 
     from agent.conversation_loop import _close_durable_failed_turn
     from agent.turn_failure_copy import FAILED_TURN_DISPLAY_KIND, PARTIAL_FAILED_TURN_NOTICE
-    from hermes_state import SessionDB
+    from kubot_state import SessionDB
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
     db = SessionDB(tmp_path / "state.db")
     sid = "s1"
     db.create_session(session_id=sid, source="tui", model="m")

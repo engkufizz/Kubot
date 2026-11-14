@@ -1,1 +1,1 @@
-# Hermes plugins package
+# Kubot plugins package

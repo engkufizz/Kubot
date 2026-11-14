@@ -11,7 +11,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import hermes_yaml
+import kubot_yaml
 import pytest
 
 from scripts.bundles.release_artifacts import materialize, record, stamp_matches
@@ -106,7 +106,7 @@ def staged_candidate(tmp_path, r2_server, https_origin):
                 (built / feed).write_text(legs[feed], encoding='utf-8')
                 includes.append(feed)
             if platform == 'termux':
-                for name in ('pool/package.deb', 'dists/hermes-stable/InRelease', 'dists/hermes-stable/Release'):
+                for name in ('pool/package.deb', 'dists/kubot-stable/InRelease', 'dists/kubot-stable/Release'):
                     path = built / 'apt' / name
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(f'index transport fixture: {name}'.encode())
@@ -130,7 +130,7 @@ def staged_candidate(tmp_path, r2_server, https_origin):
     assert all(not file['path'].startswith(('handoff-', 'metadata-')) for file in manifest['files'])
     assert all(file['url'].startswith(f'{base}/releases/tag/{attempt}/') for file in manifest['files'])
     puts = [path for method, path, _ in r2_server.requests if method == 'PUT']
-    assert puts == [f'/hermes-releases/releases/tag/{attempt}/release-candidates.json']
+    assert puts == [f'/kubot-releases/releases/tag/{attempt}/release-candidates.json']
     assert all(key.startswith(f'releases/tag/{attempt}/') for key in r2_server.store)
     assert not any(key.startswith(f'releases/tag/{tag}/') for key in r2_server.store)
     return manifest, fetched, base
@@ -233,13 +233,13 @@ def test_candidate_publication_and_store_selection(tmp_path, monkeypatch, r2_ser
     r2_server.requests.clear()
     artifacts.publish(manifest, tmp_path / 'publish', base)
     assert [path for method, path, _ in r2_server.requests if method == 'PUT'] == [
-        '/hermes-releases/releases/termux/stable/pool/package.deb']
+        '/kubot-releases/releases/termux/stable/pool/package.deb']
     r2_server.requests.clear()
     artifacts.promote(manifest, tmp_path / 'promote', base)
     puts = [path for method, path, _ in r2_server.requests if method == 'PUT']
-    assert puts == ['/hermes-releases/' + name for name in (
+    assert puts == ['/kubot-releases/' + name for name in (
         'releases/darwin/stable/stable-mac.yml', 'releases/win32/stable/stable.appinstaller',
-        'releases/termux/stable/dists/hermes-stable/Release', 'releases/termux/stable/dists/hermes-stable/InRelease')]
+        'releases/termux/stable/dists/kubot-stable/Release', 'releases/termux/stable/dists/kubot-stable/InRelease')]
     # Promotion materializes only feed legs and indexes; packages stay receipt-bound on R2.
     for item in manifest['files']:
         local = tmp_path / 'promote' / item['path']
@@ -261,7 +261,7 @@ def test_candidate_publication_and_store_selection(tmp_path, monkeypatch, r2_ser
     r2_server.requests.clear()
     with pytest.raises(ValueError, match='Channel read-back differs'):
         artifacts.promote(manifest, tmp_path / 'bad-readback', base)
-    assert [path for method, path, _ in r2_server.requests if method == 'PUT'] == ['/hermes-releases/' + pointer]
+    assert [path for method, path, _ in r2_server.requests if method == 'PUT'] == ['/kubot-releases/' + pointer]
     r2_server.corrupt_put = None
     r2_server.store[pointer] = original
     before = dict(r2_server.store)
@@ -283,7 +283,7 @@ def test_promote_writes_the_stable_mac_feed_from_the_attempt_archive(tmp_path, m
     # this test is order-independent against the per-test self-signed CA.
     monkeypatch.setattr(urllib.request, 'urlopen', https_origin.opener)
     artifacts.promote(manifest, tmp_path / 'promote', base)
-    feed = hermes_yaml.safe_load(r2_server.store['releases/darwin/stable/stable-mac.yml'][0].decode())
+    feed = kubot_yaml.safe_load(r2_server.store['releases/darwin/stable/stable-mac.yml'][0].decode())
     # The feed version is the plain package version, never the attempt ref.
     assert feed['version'] == '1.2.3'
     assert feed['version'] != manifest['archive']
@@ -301,9 +301,9 @@ def test_promote_writes_the_stable_mac_feed_from_the_attempt_archive(tmp_path, m
     r2_server.requests.clear()
     artifacts.promote(default, tmp_path / 'promote-default', base)
     puts = [path for method, path, _ in r2_server.requests if method == 'PUT']
-    assert puts == ['/hermes-releases/releases/darwin/stable/stable-mac.yml',
-                    '/hermes-releases/releases/win32/stable/stable.appinstaller']
-    feed = hermes_yaml.safe_load(r2_server.store['releases/darwin/stable/stable-mac.yml'][0].decode())
+    assert puts == ['/kubot-releases/releases/darwin/stable/stable-mac.yml',
+                    '/kubot-releases/releases/win32/stable/stable.appinstaller']
+    feed = kubot_yaml.safe_load(r2_server.store['releases/darwin/stable/stable-mac.yml'][0].decode())
     assert [entry['url'].rsplit('/', 1)[1] for entry in feed['files']] == ['HermesBundled-1.2.3-mac-arm64.zip']
 
 
@@ -326,8 +326,8 @@ def test_promote_refuses_when_the_macos_feed_is_missing(tmp_path, monkeypatch, r
 def candidate_workflow_step(tmp_path, r2_server, staged_candidate):
     """Run real workflow shell/CLIs; replace only service endpoints and tool setup."""
     manifest, fetched, base = staged_candidate
-    jobs = hermes_yaml.safe_load((ROOT / '.github/workflows/desktop-bundled-release.yml').read_text(encoding='utf-8-sig'))['jobs']
-    stable_jobs = hermes_yaml.safe_load(
+    jobs = kubot_yaml.safe_load((ROOT / '.github/workflows/desktop-bundled-release.yml').read_text(encoding='utf-8-sig'))['jobs']
+    stable_jobs = kubot_yaml.safe_load(
         (ROOT / '.github/workflows/stable-release.yml').read_text(encoding='utf-8-sig'))['jobs']
     render = next(step for step in stable_jobs['complete']['steps']
                   if step.get('name', '').startswith('Render the admitted'))
@@ -358,7 +358,7 @@ def candidate_workflow_step(tmp_path, r2_server, staged_candidate):
         f'    runpy.run_path(str({str(ROOT)!r}+"/"+args[0]),run_name="__main__")\n',
         encoding='utf-8')
     body_file = tmp_path / 'release-body'
-    body_file.write_text('<!-- HERMES_BUILDS_TABLE -->', encoding='utf-8')
+    body_file.write_text('<!-- KUBOT_BUILDS_TABLE -->', encoding='utf-8')
     gh = bin_dir / 'gh'
     gh.write_text(
         f'#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n'

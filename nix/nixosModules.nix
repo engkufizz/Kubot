@@ -1,4 +1,4 @@
-# nix/nixosModules.nix — the NixOS module for hermes-agent
+# nix/nixosModules.nix — the NixOS module for kubot-agent
 #
 # This module shares its options, its renderers for config.yaml, .env and
 # documents, and its state setup with the Home Manager module
@@ -10,23 +10,23 @@
 #   container.enable = false (default) → native systemd service
 #   container.enable = true            → OCI container (persistent writable layer)
 #
-# Container mode: hermes runs from /nix/store bind-mounted read-only into a
+# Container mode: kubot runs from /nix/store bind-mounted read-only into a
 # plain Ubuntu container. The writable layer (apt/pip/npm installs) persists
 # across restarts and agent updates. Only image/volume/options changes trigger
-# container recreation. Environment variables are written to $HERMES_HOME/.env
-# and read by hermes at startup — no container recreation needed for env changes.
+# container recreation. Environment variables are written to $KUBOT_HOME/.env
+# and read by kubot at startup — no container recreation needed for env changes.
 #
-# Tool resolution: the hermes wrapper uses --suffix PATH for nix store tools,
+# Tool resolution: the kubot wrapper uses --suffix PATH for nix store tools,
 # so apt/uv-installed versions take priority. The container entrypoint provisions
 # extensible tools on first boot: nodejs/npm via apt, uv via curl, and a Python
 # 3.11 venv (bootstrapped entirely by uv) at ~/.venv with pip seeded. Agents get
 # writable tool prefixes for npm i -g, pip install, uv tool install, etc.
 #
 # Usage:
-#   services.hermes-agent = {
+#   services.kubot-agent = {
 #     enable = true;
 #     settings.model.default = "anthropic/claude-sonnet-4";
-#     environmentFiles = [ config.sops.secrets."hermes/env".path ];
+#     environmentFiles = [ config.sops.secrets."kubot/env".path ];
 #   };
 #
 { inputs, ... }:
@@ -41,26 +41,26 @@
     }:
 
     let
-      cfg = config.services.hermes-agent;
+      cfg = config.services.kubot-agent;
       common = import ./moduleCommon.nix { inherit lib; };
 
       effectivePackage = common.effectivePackage cfg;
-      hermes-agent = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+      kubot-agent = inputs.self.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
-      hermesHome = "${cfg.stateDir}/.hermes";
+      hermesHome = "${cfg.stateDir}/.kubot";
 
       # In container mode, the agent uses the mount path in the container.
       effectiveWorkDir = if cfg.container.enable then containerWorkDir else cfg.workingDirectory;
 
       # config.yaml mode: group-writable (0660) when interactive users share this
-      # HERMES_HOME via addToSystemPackages, so they can save settings through the
+      # KUBOT_HOME via addToSystemPackages, so they can save settings through the
       # CLI/TUI without hitting EACCES; otherwise group-read-only (0640). Secrets
       # (.env) stay 0640 regardless.
       configYamlMode = if cfg.addToSystemPackages then "0660" else "0640";
 
-      containerName = "hermes-agent";
+      containerName = "kubot-agent";
       containerDataDir = "/data"; # stateDir mount point inside container
-      containerHomeDir = "/home/hermes";
+      containerHomeDir = "/home/kubot";
 
       # ── Container mode helpers ──────────────────────────────────────────
       containerBin =
@@ -70,54 +70,54 @@
           "${pkgs.podman}/bin/podman";
 
       # Runs as root inside the container on every start. Provisions the
-      # hermes user + sudo on first boot (writable layer persists), then
+      # kubot user + sudo on first boot (writable layer persists), then
       # drops privileges. Supports arbitrary base images (Debian, Alpine, etc).
-      containerEntrypoint = pkgs.writeShellScript "hermes-container-entrypoint" ''
+      containerEntrypoint = pkgs.writeShellScript "kubot-container-entrypoint" ''
         set -eu
 
-        HERMES_UID="''${HERMES_UID:?HERMES_UID must be set}"
-        HERMES_GID="''${HERMES_GID:?HERMES_GID must be set}"
+        KUBOT_UID="''${KUBOT_UID:?KUBOT_UID must be set}"
+        KUBOT_GID="''${KUBOT_GID:?KUBOT_GID must be set}"
 
-        # ── Group: ensure a group with GID=$HERMES_GID exists ──
+        # ── Group: ensure a group with GID=$KUBOT_GID exists ──
         # Check by GID (not name) to avoid collisions with pre-existing groups
         # (e.g. GID 100 = "users" on Ubuntu)
-        EXISTING_GROUP=$(getent group "$HERMES_GID" 2>/dev/null | cut -d: -f1 || true)
+        EXISTING_GROUP=$(getent group "$KUBOT_GID" 2>/dev/null | cut -d: -f1 || true)
         if [ -n "$EXISTING_GROUP" ]; then
           GROUP_NAME="$EXISTING_GROUP"
         else
-          GROUP_NAME="hermes"
+          GROUP_NAME="kubot"
           if command -v groupadd >/dev/null 2>&1; then
-            groupadd -g "$HERMES_GID" "$GROUP_NAME"
+            groupadd -g "$KUBOT_GID" "$GROUP_NAME"
           elif command -v addgroup >/dev/null 2>&1; then
-            addgroup -g "$HERMES_GID" "$GROUP_NAME" 2>/dev/null || true
+            addgroup -g "$KUBOT_GID" "$GROUP_NAME" 2>/dev/null || true
           fi
         fi
 
-        # ── User: ensure a user with UID=$HERMES_UID exists ──
-        PASSWD_ENTRY=$(getent passwd "$HERMES_UID" 2>/dev/null || true)
+        # ── User: ensure a user with UID=$KUBOT_UID exists ──
+        PASSWD_ENTRY=$(getent passwd "$KUBOT_UID" 2>/dev/null || true)
         if [ -n "$PASSWD_ENTRY" ]; then
           TARGET_USER=$(echo "$PASSWD_ENTRY" | cut -d: -f1)
           TARGET_HOME=$(echo "$PASSWD_ENTRY" | cut -d: -f6)
         else
-          TARGET_USER="hermes"
-          TARGET_HOME="/home/hermes"
+          TARGET_USER="kubot"
+          TARGET_HOME="/home/kubot"
           if command -v useradd >/dev/null 2>&1; then
-            useradd -u "$HERMES_UID" -g "$HERMES_GID" -m -d "$TARGET_HOME" -s /bin/bash "$TARGET_USER"
+            useradd -u "$KUBOT_UID" -g "$KUBOT_GID" -m -d "$TARGET_HOME" -s /bin/bash "$TARGET_USER"
           elif command -v adduser >/dev/null 2>&1; then
-            adduser -u "$HERMES_UID" -D -h "$TARGET_HOME" -s /bin/sh -G "$GROUP_NAME" "$TARGET_USER" 2>/dev/null || true
+            adduser -u "$KUBOT_UID" -D -h "$TARGET_HOME" -s /bin/sh -G "$GROUP_NAME" "$TARGET_USER" 2>/dev/null || true
           fi
         fi
         mkdir -p "$TARGET_HOME"
-        chown "$HERMES_UID:$HERMES_GID" "$TARGET_HOME"
+        chown "$KUBOT_UID:$KUBOT_GID" "$TARGET_HOME"
         chmod 0750 "$TARGET_HOME"
 
-        # Ensure HERMES_HOME is owned by the target user.
+        # Ensure KUBOT_HOME is owned by the target user.
         # Use find instead of chown -R: chown strips the setgid bit (kernel
         # behavior), destroying the 2770 permissions the NixOS activation
         # script sets for group access by hostUsers.  Only touch files with
         # wrong ownership so correctly-owned dirs keep their permission bits.
-        if [ -n "''${HERMES_HOME:-}" ] && [ -d "$HERMES_HOME" ]; then
-          find "$HERMES_HOME" \! -user "$HERMES_UID" -exec chown "$HERMES_UID:$HERMES_GID" {} +
+        if [ -n "''${KUBOT_HOME:-}" ] && [ -d "$KUBOT_HOME" ]; then
+          find "$KUBOT_HOME" \! -user "$KUBOT_UID" -exec chown "$KUBOT_UID:$KUBOT_GID" {} +
         fi
 
         # ── Provision apt packages (first boot only, cached in writable layer) ──
@@ -125,7 +125,7 @@
         # nodejs/npm: writable node so npm i -g works (nix store copies are read-only)
         #   Node 22 via NodeSource — Ubuntu 24.04 ships Node 18 which is EOL.
         # curl: needed for uv installer + NodeSource setup
-        if [ ! -f /var/lib/hermes-tools-provisioned ] && command -v apt-get >/dev/null 2>&1; then
+        if [ ! -f /var/lib/kubot-tools-provisioned ] && command -v apt-get >/dev/null 2>&1; then
           echo "First boot: provisioning agent tools..."
           apt-get update -qq
           apt-get install -y -qq sudo curl ca-certificates gnupg
@@ -136,13 +136,13 @@
             > /etc/apt/sources.list.d/nodesource.list
           apt-get update -qq
           apt-get install -y -qq nodejs
-          touch /var/lib/hermes-tools-provisioned
+          touch /var/lib/kubot-tools-provisioned
         fi
 
-        if command -v sudo >/dev/null 2>&1 && [ ! -f /etc/sudoers.d/hermes ]; then
+        if command -v sudo >/dev/null 2>&1 && [ ! -f /etc/sudoers.d/kubot ]; then
           mkdir -p /etc/sudoers.d
-          echo "$TARGET_USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/hermes
-          chmod 0440 /etc/sudoers.d/hermes
+          echo "$TARGET_USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubot
+          chmod 0440 /etc/sudoers.d/kubot
         fi
 
         # uv (Python manager) — not in Ubuntu repos, retry-safe outside the sentinel
@@ -167,7 +167,7 @@
         fi
 
         if command -v setpriv >/dev/null 2>&1; then
-          exec setpriv --reuid="$HERMES_UID" --regid="$HERMES_GID" --init-groups "$@"
+          exec setpriv --reuid="$KUBOT_UID" --regid="$KUBOT_GID" --init-groups "$@"
         elif command -v su >/dev/null 2>&1; then
           exec su -s /bin/sh "$TARGET_USER" -c 'exec "$0" "$@"' -- "$@"
         else
@@ -178,7 +178,7 @@
 
       # Identity hash — only recreate container when structural config changes.
       # Package and entrypoint use stable symlinks (current-package, current-entrypoint)
-      # so they can update without recreation. Env vars go through $HERMES_HOME/.env.
+      # so they can update without recreation. Env vars go through $KUBOT_HOME/.env.
       containerIdentity = builtins.hashString "sha256" (
         builtins.toJSON {
           schema = 4; # bump when identity inputs change (4: Node 18→22 via NodeSource)
@@ -192,15 +192,15 @@
 
       # The CLI on the host reads this file, in get_container_exec_info. The
       # file tells the CLI to run in the container and not on the host.
-      containerModeFile = pkgs.writeText "hermes-container-mode" ''
+      containerModeFile = pkgs.writeText "kubot-container-mode" ''
         # Written by the NixOS activation script. Do not edit manually.
         backend=${cfg.container.backend}
         container_name=${containerName}
         exec_user=${cfg.user}
-        hermes_bin=${containerDataDir}/current-package/bin/hermes
+        kubot_bin=${containerDataDir}/current-package/bin/kubot
       '';
 
-      # Default: /var/lib/hermes/workspace → /data/workspace.
+      # Default: /var/lib/kubot/workspace → /data/workspace.
       # Custom paths outside stateDir pass through unchanged (user must add extraVolumes).
       containerWorkDir =
         if lib.hasPrefix "${cfg.stateDir}/" cfg.workingDirectory then
@@ -219,7 +219,7 @@
         RestartSec = cfg.restartSec;
 
         # Shared-state: files created by the service should be group-writable
-        # so interactive users in the hermes group can read/write them.
+        # so interactive users in the kubot group can read/write them.
         UMask = "0007";
 
         # Hardening
@@ -250,10 +250,10 @@
 
     in
     {
-      options.services.hermes-agent =
+      options.services.kubot-agent =
         common.sharedOptions {
-          defaultPackage = hermes-agent;
-          defaultPackageText = lib.literalExpression "hermes-agent.packages.\${system}.default";
+          defaultPackage = kubot-agent;
+          defaultPackageText = lib.literalExpression "kubot-agent.packages.\${system}.default";
           defaultWorkingDirectory = "${cfg.stateDir}/workspace";
           defaultWorkingDirectoryText = lib.literalExpression ''"''${cfg.stateDir}/workspace"'';
         }
@@ -263,13 +263,13 @@
             # ── Service identity ───────────────────────────────────────────
             user = mkOption {
               type = types.str;
-              default = "hermes";
+              default = "kubot";
               description = "System user running the gateway.";
             };
 
             group = mkOption {
               type = types.str;
-              default = "hermes";
+              default = "kubot";
               description = "System group running the gateway.";
             };
 
@@ -282,16 +282,16 @@
             # ── Directories ────────────────────────────────────────────────
             stateDir = mkOption {
               type = types.str;
-              default = "/var/lib/hermes";
-              description = "State directory. Contains .hermes/ subdir (HERMES_HOME).";
+              default = "/var/lib/kubot";
+              description = "State directory. Contains .kubot/ subdir (KUBOT_HOME).";
             };
 
             addToSystemPackages = mkOption {
               type = types.bool;
               default = false;
               description = ''
-                Add the hermes CLI to environment.systemPackages and export
-                HERMES_HOME system-wide (via environment.variables) so interactive
+                Add the kubot CLI to environment.systemPackages and export
+                KUBOT_HOME system-wide (via environment.variables) so interactive
                 shells share state with the gateway service.
               '';
             };
@@ -332,8 +332,8 @@
                 type = types.listOf types.str;
                 default = [ ];
                 description = ''
-                  Interactive users who get a ~/.hermes symlink to the service
-                  stateDir. These users are automatically added to the hermes group.
+                  Interactive users who get a ~/.kubot symlink to the service
+                  stateDir. These users are automatically added to the kubot group.
                 '';
                 example = [ "sidbin" ];
               };
@@ -346,7 +346,7 @@
 
           # ── Merge MCP servers into settings ────────────────────────────────
           (lib.mkIf (cfg.mcpServers != { }) {
-            services.hermes-agent.settings.mcp_servers = common.mcpServersToConfig cfg.mcpServers;
+            services.kubot-agent.settings.mcp_servers = common.mcpServersToConfig cfg.mcpServers;
           })
 
           # ── User / group ──────────────────────────────────────────────────
@@ -372,12 +372,12 @@
           })
 
           # ── Host CLI ──────────────────────────────────────────────────────
-          # Add the hermes CLI to system PATH and export HERMES_HOME system-wide
+          # Add the kubot CLI to system PATH and export KUBOT_HOME system-wide
           # so interactive shells share state (sessions, skills, cron) with the
-          # gateway service instead of creating a separate ~/.hermes/.
+          # gateway service instead of creating a separate ~/.kubot/.
           (lib.mkIf cfg.addToSystemPackages {
             environment.systemPackages = [ effectivePackage ];
-            environment.variables.HERMES_HOME = hermesHome;
+            environment.variables.KUBOT_HOME = hermesHome;
           })
 
           # ── Host user group membership ─────────────────────────────────────
@@ -392,16 +392,16 @@
             assertions =
               common.pluginNameAssertions {
                 inherit cfg;
-                optionPath = "services.hermes-agent";
+                optionPath = "services.kubot-agent";
               }
               ++ common.workspaceFilesAssertions {
                 inherit cfg;
-                opt = options.services.hermes-agent.workingDirectory;
-                optionPath = "services.hermes-agent";
+                opt = options.services.kubot-agent.workingDirectory;
+                optionPath = "services.kubot-agent";
               }
               ++ common.backendBindAssertions {
                 inherit cfg;
-                optionPath = "services.hermes-agent";
+                optionPath = "services.kubot-agent";
               }
               ++ [
                 {
@@ -409,13 +409,13 @@
                   # process needs its own container and its own ports. This
                   # module does not do that.
                   assertion = !(cfg.container.enable && cfg.backend.mode != "none");
-                  message = "services.hermes-agent: backend.mode is not supported together with container.enable — the container runs the gateway only.";
+                  message = "services.kubot-agent: backend.mode is not supported together with container.enable — the container runs the gateway only.";
                 }
               ];
           }
 
           # ── Per-user profile for extraPackages ───────────────────────────
-          # Wire extraPackages into the hermes user's per-user profile so the
+          # Wire extraPackages into the kubot user's per-user profile so the
           # login-shell snapshot (which rebuilds PATH from NixOS profiles) sees
           # them.  The systemd service PATH also includes them for direct access.
           (lib.mkIf (cfg.extraPackages != [ ]) {
@@ -431,10 +431,10 @@
             {
               warnings = [
                 ''
-                  services.hermes-agent: container.enable is true and container.hostUsers
-                  is set, but addToSystemPackages is false. Without a host-installed hermes
+                  services.kubot-agent: container.enable is true and container.hostUsers
+                  is set, but addToSystemPackages is false. Without a host-installed kubot
                   binary, container routing will not work for interactive users.
-                  Set addToSystemPackages = true or ensure hermes is on PATH.
+                  Set addToSystemPackages = true or ensure kubot is on PATH.
                 ''
               ];
             }
@@ -453,7 +453,7 @@
 
           # ── Activation: link config + auth + documents ────────────────────
           {
-            system.activationScripts."hermes-agent-setup" =
+            system.activationScripts."kubot-agent-setup" =
               lib.stringAfter
                 (
                   [ "users" ] ++ lib.optional (config.system.activationScripts ? setupSecrets) "setupSecrets"
@@ -516,12 +516,12 @@
                             user:
                             let
                               userHome = config.users.users.${user}.home;
-                              symlinkPath = "${userHome}/.hermes";
+                              symlinkPath = "${userHome}/.kubot";
                             in
                             ''
                               if [ -L "${symlinkPath}" ] && [ "$(readlink "${symlinkPath}")" = "${hermesHome}" ]; then
                                 rm -f "${symlinkPath}"
-                                echo "hermes-agent: removed symlink ${symlinkPath}"
+                                echo "kubot-agent: removed symlink ${symlinkPath}"
                               fi
                             ''
                           ) cfg.container.hostUsers
@@ -530,7 +530,7 @@
                   }
 
                   # ── Symlink bridge for interactive users ───────────────────────
-                  # Create ~/.hermes -> stateDir/.hermes for each hostUser so the
+                  # Create ~/.kubot -> stateDir/.kubot for each hostUser so the
                   # host CLI shares state with the container service.
                   # Only runs when container mode is enabled.
                   ${lib.optionalString cfg.container.enable (
@@ -539,14 +539,14 @@
                         user:
                         let
                           userHome = config.users.users.${user}.home;
-                          symlinkPath = "${userHome}/.hermes";
+                          symlinkPath = "${userHome}/.kubot";
                         in
                         ''
                           if [ -d "${symlinkPath}" ] && [ ! -L "${symlinkPath}" ]; then
                             # Real directory — back it up, then create symlink.
                             # (ln -sfn cannot atomically replace a directory.)
                             _backup="${symlinkPath}.bak.$(date +%s)"
-                            echo "hermes-agent: backing up existing ${symlinkPath} to $_backup"
+                            echo "kubot-agent: backing up existing ${symlinkPath} to $_backup"
                             mv "${symlinkPath}" "$_backup"
                           fi
                           # For everything else (existing symlink, doesn't exist, etc.)
@@ -564,8 +564,8 @@
           # MODE A: Native systemd service (default)
           # ══════════════════════════════════════════════════════════════════
           (lib.mkIf (!cfg.container.enable) {
-            systemd.services.hermes-agent = {
-              description = "Hermes Agent Gateway";
+            systemd.services.kubot-agent = {
+              description = "Kubot Agent Gateway";
               wantedBy = [ "multi-user.target" ];
               # linger-users.service is the unit that runs `loginctl
               # enable-linger` for a declared `users.users.<name>.linger`.
@@ -579,7 +579,7 @@
               ++ lib.optional lingerEnabled "linger-users.service";
 
               # cfg.environment and cfg.environmentFiles are written to
-              # $HERMES_HOME/.env by the activation script. load_hermes_dotenv()
+              # $KUBOT_HOME/.env by the activation script. load_kubot_dotenv()
               # reads them at Python startup — no systemd EnvironmentFile needed.
               environment = commonUnitEnvironment;
 
@@ -598,7 +598,7 @@
                   sleep 0.2
                 done
                 if [ ! -S "/run/user/$(id -u)/bus" ]; then
-                  echo "hermes-agent: no user bus at /run/user/$(id -u)/bus after 10s;" \
+                  echo "kubot-agent: no user bus at /run/user/$(id -u)/bus after 10s;" \
                        "restart-safe cron dispatch will fail for the life of this process" >&2
                 fi
               '';
@@ -611,11 +611,11 @@
             };
           })
 
-          # ── The backend: hermes serve or hermes dashboard ─────────────────
+          # ── The backend: kubot serve or kubot dashboard ─────────────────
           # This is a different process from the gateway. Both use one
-          # HERMES_HOME.
+          # KUBOT_HOME.
           (lib.mkIf (!cfg.container.enable && cfg.backend.mode != "none") {
-            systemd.services.hermes-backend = {
+            systemd.services.kubot-backend = {
               description = common.backendDescription cfg;
               wantedBy = [ "multi-user.target" ];
               after = [ "network-online.target" ];
@@ -638,8 +638,8 @@
             # Ensure the container runtime is available
             virtualisation.docker.enable = lib.mkDefault (cfg.container.backend == "docker");
 
-            systemd.services.hermes-agent = {
-              description = "Hermes Agent Gateway (container)";
+            systemd.services.kubot-agent = {
+              description = "Kubot Agent Gateway (container)";
               wantedBy = [ "multi-user.target" ];
               after = [
                 "network-online.target"
@@ -669,8 +669,8 @@
 
                 if [ "$NEED_CREATE" = "true" ]; then
                   # Resolve numeric UID/GID — passed to entrypoint for in-container user setup
-                  HERMES_UID=$(${pkgs.coreutils}/bin/id -u ${cfg.user})
-                  HERMES_GID=$(${pkgs.coreutils}/bin/id -g ${cfg.user})
+                  KUBOT_UID=$(${pkgs.coreutils}/bin/id -u ${cfg.user})
+                  KUBOT_GID=$(${pkgs.coreutils}/bin/id -g ${cfg.user})
 
                   echo "Creating container..."
                   ${containerBin} create \
@@ -681,14 +681,14 @@
                     --volume ${cfg.stateDir}:${containerDataDir} \
                     --volume ${cfg.stateDir}/home:${containerHomeDir} \
                     ${lib.concatStringsSep " " (map (v: "--volume ${v}") cfg.container.extraVolumes)} \
-                    --env HERMES_UID="$HERMES_UID" \
-                    --env HERMES_GID="$HERMES_GID" \
-                    --env HERMES_HOME=${containerDataDir}/.hermes \
-                    --env HERMES_MANAGED=true \
+                    --env KUBOT_UID="$KUBOT_UID" \
+                    --env KUBOT_GID="$KUBOT_GID" \
+                    --env KUBOT_HOME=${containerDataDir}/.kubot \
+                    --env KUBOT_MANAGED=true \
                     --env HOME=${containerHomeDir} \
                     ${lib.concatStringsSep " " cfg.container.extraOptions} \
                     ${cfg.container.image} \
-                    ${containerDataDir}/current-package/bin/hermes gateway run --replace ${lib.concatStringsSep " " cfg.extraArgs}
+                    ${containerDataDir}/current-package/bin/kubot gateway run --replace ${lib.concatStringsSep " " cfg.extraArgs}
 
                   echo "${containerIdentity}" > ${identityFile}
                 fi

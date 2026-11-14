@@ -25,7 +25,7 @@ resolved result.
 
 import types
 
-import hermes_yaml as yaml
+import kubot_yaml as yaml
 import pytest
 
 from gateway.config import Platform
@@ -61,7 +61,7 @@ def _make_event(text):
 
 
 def _fake_switch_result(*, base_url="", api_mode=""):
-    from hermes_cli.model_switch import ModelSwitchResult
+    from kubot_cli.model_switch import ModelSwitchResult
 
     return ModelSwitchResult(
         success=True,
@@ -79,30 +79,30 @@ def _fake_switch_result(*, base_url="", api_mode=""):
 def _setup_isolated_home(tmp_path, monkeypatch, model_yaml_value, *, base_url="", api_mode=""):
     import gateway.run as gateway_run
 
-    hermes_home = tmp_path / ".hermes"
-    hermes_home.mkdir()
-    cfg_path = hermes_home / "config.yaml"
+    kubot_home = tmp_path / ".kubot"
+    kubot_home.mkdir()
+    cfg_path = kubot_home / "config.yaml"
     cfg_path.write_text(
         yaml.safe_dump({"model": model_yaml_value, "providers": {}}),
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(gateway_run, "_hermes_home", hermes_home)
+    monkeypatch.setattr(gateway_run, "_kubot_home", kubot_home)
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", dict)
     monkeypatch.setattr(
-        "hermes_cli.model_switch_providers.list_picker_providers",
+        "kubot_cli.model_switch_providers.list_picker_providers",
         lambda **kw: [{"slug": "custom", "name": "Custom", "models": ["local-llama"]}],
     )
     monkeypatch.setattr(
-        "hermes_cli.model_switch.switch_model",
+        "kubot_cli.model_switch.switch_model",
         lambda **kw: _fake_switch_result(base_url=base_url, api_mode=api_mode),
     )
     monkeypatch.setattr(
-        "hermes_cli.model_switch.resolve_display_context_length",
+        "kubot_cli.model_switch.resolve_display_context_length",
         lambda *a, **k: 8192,
     )
-    monkeypatch.setattr("hermes_constants.get_hermes_home", lambda: hermes_home)
-    monkeypatch.setattr("hermes_cli.config.get_hermes_home", lambda: hermes_home)
+    monkeypatch.setattr("kubot_constants.get_kubot_home", lambda: kubot_home)
+    monkeypatch.setattr("kubot_cli.config.get_kubot_home", lambda: kubot_home)
     return cfg_path
 
 

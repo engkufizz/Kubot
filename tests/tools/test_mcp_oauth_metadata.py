@@ -29,7 +29,7 @@ pytest.importorskip("mcp.shared.auth", reason="MCP SDK not installed")
 from mcp.shared.auth import OAuthMetadata
 
 from tools.mcp_oauth import HermesTokenStorage
-from tools.mcp_oauth_manager import _HERMES_PROVIDER_CLS
+from tools.mcp_oauth_manager import _KUBOT_PROVIDER_CLS
 
 
 def _make_metadata(token_endpoint: str = "https://auth.example.com/oauth/token") -> OAuthMetadata:
@@ -50,7 +50,7 @@ def _make_metadata(token_endpoint: str = "https://auth.example.com/oauth/token")
 
 class TestMetadataStorage:
     def test_save_and_load_roundtrip(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
         storage = HermesTokenStorage("example-server")
 
         meta = _make_metadata()
@@ -66,7 +66,7 @@ class TestMetadataStorage:
 
 
     def test_remove_deletes_meta_file(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
         storage = HermesTokenStorage("cleanup-server")
 
         storage.save_oauth_metadata(_make_metadata())
@@ -87,10 +87,10 @@ def _manager_provider_with_context(storage: HermesTokenStorage, **context_attrs)
     Bypasses the full OAuthClientProvider init so we can exercise the
     override logic in isolation.
     """
-    if _HERMES_PROVIDER_CLS is None:
+    if _KUBOT_PROVIDER_CLS is None:
         pytest.skip("MCP SDK auth not available")
-    provider = _HERMES_PROVIDER_CLS.__new__(_HERMES_PROVIDER_CLS)
-    provider._hermes_server_name = context_attrs.get("server_name", "srv")
+    provider = _KUBOT_PROVIDER_CLS.__new__(_KUBOT_PROVIDER_CLS)
+    provider._kubot_server_name = context_attrs.get("server_name", "srv")
     context = MagicMock()
     context.storage = storage
     context.oauth_metadata = context_attrs.get("oauth_metadata")
@@ -104,13 +104,13 @@ def _manager_provider_with_context(storage: HermesTokenStorage, **context_attrs)
 class TestManagerOAuthProviderMetadata:
     def test_initialize_restores_metadata_from_disk(self, tmp_path, monkeypatch):
         """Cold-load: if we have no in-memory metadata but disk has some, restore it."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
         storage = HermesTokenStorage("mgr-srv")
         storage.save_oauth_metadata(_make_metadata("https://mgr.example.com/token"))
         provider = _manager_provider_with_context(storage, oauth_metadata=None)
 
         with patch.object(
-            _HERMES_PROVIDER_CLS.__bases__[-1], "_initialize", new=AsyncMock()
+            _KUBOT_PROVIDER_CLS.__bases__[-1], "_initialize", new=AsyncMock()
         ):
             asyncio.run(provider._initialize())
 
@@ -121,7 +121,7 @@ class TestManagerOAuthProviderMetadata:
 
     def test_async_auth_flow_persists_on_completion(self, tmp_path, monkeypatch):
         """End-to-end: running the wrapped auth_flow persists discovered metadata."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("KUBOT_HOME", str(tmp_path))
         storage = HermesTokenStorage("flow-srv")
         provider = _manager_provider_with_context(
             storage,
@@ -137,7 +137,7 @@ class TestManagerOAuthProviderMetadata:
         manager.invalidate_if_disk_changed = AsyncMock(return_value=False)
 
         with patch.object(
-            _HERMES_PROVIDER_CLS.__bases__[-1],
+            _KUBOT_PROVIDER_CLS.__bases__[-1],
             "async_auth_flow",
             new=fake_parent_flow,
         ), patch("tools.mcp_oauth_manager.get_manager", return_value=manager):

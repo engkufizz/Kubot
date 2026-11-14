@@ -1,5 +1,5 @@
-"""Launch-profile policy for a process that hosts several profile homes (``hermes serve`` /
-``hermes dashboard`` pooling, ``?profile=``, hosted rooms; the multiplexed gateway's own worker).
+"""Launch-profile policy for a process that hosts several profile homes (``kubot serve`` /
+``kubot dashboard`` pooling, ``?profile=``, hosted rooms; the multiplexed gateway's own worker).
 
 Two facts anchor this module:
 
@@ -56,15 +56,15 @@ def _servable_profile_homes() -> set:
     carrying a real servability marker.
 
     ``named_profile_has_identity`` accepts an EMPTY ``.env``, which is all a crashed
-    ``hermes profile create`` leaves behind — counting it would flip a single-profile host
+    ``kubot profile create`` leaves behind — counting it would flip a single-profile host
     fail-closed at its next boot.
     """
-    from hermes_constants import named_profile_has_servable_identity
-    from hermes_cli.profiles import profiles_to_serve
+    from kubot_constants import named_profile_has_servable_identity
+    from kubot_cli.profiles import profiles_to_serve
 
     homes = {Path(home).resolve() for name, home in profiles_to_serve(multiplex=True, include_standalone=True, include_parked=True)
              if name == "default" or named_profile_has_servable_identity(home)}
-    homes.add(Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes").resolve())
+    homes.add(Path(os.environ.get("KUBOT_HOME") or Path.home() / ".kubot").resolve())
     return homes
 
 
@@ -75,7 +75,7 @@ def activate_multi_profile_hosting_eagerly() -> bool:
     home. Everything the host had already done by then (idle-reaper ticks, cron start, adapter
     connects, MCP discovery) ran under single-profile assumptions and is never re-scoped, and the
     launch profile's env had already been mutated by then, so ``capture_launch_env`` froze a
-    polluted snapshot. One ``hermes serve`` / ``hermes gateway run`` per host means the process
+    polluted snapshot. One ``kubot serve`` / ``kubot gateway run`` per host means the process
     knows at boot whether it can be asked for a second home: decide there, once. Call it as the LAST
     boot step: the frozen snapshot is the only source for launch keys with no ``.env`` to rebuild
     from, so every credential the boot still injects must already be in ``os.environ``.
@@ -109,7 +109,7 @@ def activate_multi_profile_hosting_eagerly() -> bool:
     # Route each home's records to its own logs/ now: the Desktop cron ticker used to be the only
     # caller, and it stands down when a live gateway owns cron, leaving every secondary profile's
     # model/cwd lines in the launch profile's agent.log.
-    from hermes_logging import enable_profile_log_routing
+    from kubot_logging import enable_profile_log_routing
     enable_profile_log_routing(sorted(homes))
     return True
 
@@ -174,8 +174,8 @@ def launch_body() -> Iterator[None]:
     profile switches the gateway to fail-closed mid-body, an unscoped read resolves from
     ``launch_secret_scope`` (frozen env + ``.env``) instead of raising ``UnscopedSecretError``."""
     from agent.secret_scope import reset_launch_body_scope, set_launch_body_scope
-    from hermes_constants import get_process_hermes_home
-    home = get_process_hermes_home()
+    from kubot_constants import get_process_kubot_home
+    home = get_process_kubot_home()
     token = set_launch_body_scope(lambda: launch_secret_scope(home))
     try:
         yield
@@ -185,7 +185,7 @@ def launch_body() -> Iterator[None]:
 
 @contextlib.contextmanager
 def launch_profile_runtime_scope(launch_home: str | Path) -> Iterator[None]:
-    """Bind the launch profile's own runtime scope for one body: HERMES_HOME override naming the
+    """Bind the launch profile's own runtime scope for one body: KUBOT_HOME override naming the
     launch home, ``launch_secret_scope``, and its terminal policy over the frozen launch
     ``TERMINAL_*`` overlay. For hosts whose launch-profile bodies are not RPC sessions (the
     standalone messaging gateway after a hosted room activated multiplexing, #112878).
@@ -212,17 +212,17 @@ def launch_profile_runtime_scope(launch_home: str | Path) -> Iterator[None]:
 def profile_config_scope(home: str | Path, *, launch_home: str | Path | None = None) -> Iterator[None]:
     """Bind *home*'s home + secret + terminal scope for a body that reads and writes its config.
 
-    The launch home (``launch_home``, default ``get_process_hermes_home()``) gets its launch secret
+    The launch home (``launch_home``, default ``get_process_kubot_home()``) gets its launch secret
     scope with no home override or terminal scope (an enclosing secondary's are unbound for the
     body), or the full :func:`launch_profile_runtime_scope` once the process multiplexes. Any other
     home gets only its own files, stamped as foreign. No external-source hydration.
     """
     from agent.secret_scope import build_profile_secret_scope, is_multiplex_active, reset_secret_scope, set_secret_scope
-    from hermes_constants import get_process_hermes_home, reset_hermes_home_override, set_hermes_home_override
+    from kubot_constants import get_process_kubot_home, reset_kubot_home_override, set_kubot_home_override
     from tools.terminal_scope import install_profile_terminal_scope, reset_terminal_scope, set_terminal_scope
 
     home = Path(home)
-    launch = Path(launch_home if launch_home is not None else get_process_hermes_home())
+    launch = Path(launch_home if launch_home is not None else get_process_kubot_home())
     with contextlib.ExitStack() as stack:
         if home.resolve() == launch.resolve():
             if is_multiplex_active():
@@ -231,12 +231,12 @@ def profile_config_scope(home: str | Path, *, launch_home: str | Path | None = N
                 # Unbind an enclosing secondary's home and terminal, or the launch secrets would
                 # pair with that profile's config. Unset resolves to the process home, which is the
                 # launch home for every caller (``launch_home`` defaults to it; the RPC passes it).
-                stack.callback(reset_hermes_home_override, set_hermes_home_override(None))
+                stack.callback(reset_kubot_home_override, set_kubot_home_override(None))
                 stack.callback(reset_secret_scope, set_secret_scope(launch_secret_scope(launch)))
                 stack.callback(reset_terminal_scope, set_terminal_scope(None))
         else:
             secrets = build_profile_secret_scope(home)
-            stack.callback(reset_hermes_home_override, set_hermes_home_override(str(home)))
+            stack.callback(reset_kubot_home_override, set_kubot_home_override(str(home)))
             stack.callback(reset_secret_scope, set_secret_scope(secrets, profile_home=str(home)))
             stack.callback(reset_terminal_scope, install_profile_terminal_scope(home))
         yield
@@ -257,8 +257,8 @@ def launch_profile_scope_if_multiplexed():
     from agent.secret_scope import is_multiplex_active
     if not is_multiplex_active():
         return contextlib.nullcontext()
-    from hermes_constants import get_process_hermes_home
-    return launch_profile_runtime_scope(get_process_hermes_home())
+    from kubot_constants import get_process_kubot_home
+    return launch_profile_runtime_scope(get_process_kubot_home())
 
 
 @contextlib.asynccontextmanager

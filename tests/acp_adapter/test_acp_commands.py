@@ -14,7 +14,7 @@ class FakeAgent:
     def __init__(self):
         self.model = "fake-model"
         self.provider = "fake-provider"
-        self.enabled_toolsets = ["hermes-acp"]
+        self.enabled_toolsets = ["kubot-acp"]
         self.disabled_toolsets = []
         self.tools = []
         self.valid_tool_names = set()
@@ -92,12 +92,12 @@ def test_acp_real_agent_gets_session_db_for_recall(monkeypatch):
         return module
 
     monkeypatch.setitem(sys.modules, "run_agent", mod("run_agent", AIAgent=CapturingAgent))
-    monkeypatch.setattr("hermes_cli.config.load_config", lambda: {"model": {"default": "m", "provider": "p"}})
+    monkeypatch.setattr("kubot_cli.config.load_config", lambda: {"model": {"default": "m", "provider": "p"}})
     monkeypatch.setitem(
         sys.modules,
-        "hermes_cli.runtime_provider",
+        "kubot_cli.runtime_provider",
         mod(
-            "hermes_cli.runtime_provider",
+            "kubot_cli.runtime_provider",
             resolve_runtime_provider=lambda **_kwargs: {
                 "provider": "p",
                 "api_mode": "chat_completions",

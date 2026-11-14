@@ -1,32 +1,32 @@
 # ============================================================================
 # Windows Desktop GUI install + update E2E driver (the REAL user flow)
 # ============================================================================
-# Proves, on a real Windows machine, that a user who installs Hermes the way
+# Proves, on a real Windows machine, that a user who installs Kubot the way
 # the website tells them to can then update to the commit under test through
 # a real update surface -- with every leg driven through the GUI a user
 # actually touches:
 #
-#   INSTALL   - downloads the production Hermes-Setup.exe from the website,
+#   INSTALL   - downloads the production Kubot-Setup.exe from the website,
 #               launches it HEADED, and AutoHotkey clicks Install, waits,
-#               then clicks Launch. The real Electron Hermes.exe must appear.
+#               then clicks Launch. The real Electron Kubot.exe must appear.
 #               The exe runs EXACTLY as shipped against serve.git, whose
 #               `main` is parked at OLD (-InstallRef, default: the newest
 #               release tag) -- so the install lands on OLD the same way a
 #               user's install landed on whatever main served that day.
 #   UPDATE    - OLD -> HEAD through the route selected by -Route:
-#                 desktop    (implemented) launch the installed Hermes.exe
+#                 desktop    (implemented) launch the installed Kubot.exe
 #                            under Playwright's Electron driver and CLICK
 #                            Settings -> About -> "Update now". The
 #                            production hand-off chain runs untouched:
-#                            marker, app quit, detached updater, `hermes
+#                            marker, app quit, detached updater, `kubot
 #                            update`, desktop rebuild, RELAUNCH. Asserts
 #                            target sha, marker cleanup, result JSON (when
-#                            the script path wrote one), working hermes,
+#                            the script path wrote one), working kubot,
 #                            and the relaunched app window.
-#                 update     run `hermes update` from the installed command
+#                 update     run `kubot update` from the installed command
 #                            (the CLI route a GUI user might take).
 #                 installer  re-run the bootstrap installer over the
-#                            existing install (download Hermes-Setup.exe
+#                            existing install (download Kubot-Setup.exe
 #                            again, AHK clicks Install; lands on HEAD).
 #
 # HOW THE STAGING WORKS (no MITM proxy, no network fakery):
@@ -35,7 +35,7 @@
 #   canonical repo URLs, via a driver-owned gitconfig selected with
 #   GIT_CONFIG_GLOBAL. (NOT GIT_CONFIG_COUNT/KEY_n/VALUE_n env config --
 #   install.ps1 sets those itself and silently clobbers them.) The
-#   installer's `git clone` and `hermes update`'s `git fetch origin`
+#   installer's `git clone` and `kubot update`'s `git fetch origin`
 #   transparently hit OUR bare repo. Its `main` serves OLD for the install
 #   phase; the update phase advances it to HEAD -- an update becomes
 #   available exactly the way it does for a real user. Installer and
@@ -81,15 +81,15 @@ param(
     [string]$InstallMethod = "desktop-installer@latest",
 
     # Update method to exercise in the update phase, same id namespace.
-    # open-app-update (from a desktop-installer install) and hermes-update /
+    # open-app-update (from a desktop-installer install) and kubot-update /
     # installer-script / installer-script+desktop (from script installs) are
     # implemented; the rest are declared arms so the surface is stable when
     # they land.
-    [ValidateSet("open-app-update", "hermes-desktop-app-update", "hermes-update", "desktop-installer@latest", "installer-script", "installer-script+desktop")]
+    [ValidateSet("open-app-update", "kubot-desktop-app-update", "kubot-update", "desktop-installer@latest", "installer-script", "installer-script+desktop")]
     [string]$Route = "open-app-update",
 
     # The OLD version: the ref served as `main` while the installer runs,
-    # i.e. what the user starts on. The published Hermes-Setup.exe carries
+    # i.e. what the user starts on. The published Kubot-Setup.exe carries
     # no commit pin (Pin { commit: None, branch: "main" }) -- it installs
     # whatever `main` points at, so staging OLD means serving it there.
     # Empty or "auto" = newest release tag in the checkout (the "user on
@@ -107,12 +107,12 @@ param(
     # Repo checkout whose HEAD is the update target.
     [string]$RepoRoot = "",
 
-    [string]$WorkRoot = $(if ($env:HERMES_E2E_WORKROOT) { $env:HERMES_E2E_WORKROOT } else { Join-Path $env:TEMP "hermes-desktop-gui-e2e" }),
+    [string]$WorkRoot = $(if ($env:KUBOT_E2E_WORKROOT) { $env:KUBOT_E2E_WORKROOT } else { Join-Path $env:TEMP "kubot-desktop-gui-e2e" }),
 
-    [string]$SetupExeUrl = "https://hermes-assets.nousresearch.com/Hermes-Setup.exe",
+    [string]$SetupExeUrl = "https://kubot-assets.nousresearch.com/Kubot-Setup.exe",
 
     # Driver dependencies come from the current checkout lockfile.
-    [string]$DriverNode = $env:HERMES_E2E_NODE
+    [string]$DriverNode = $env:KUBOT_E2E_NODE
 )
 
 $ErrorActionPreference = "Stop"
@@ -123,41 +123,41 @@ $env:PYTHONIOENCODING = "utf-8"
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
 $OutputEncoding = [Console]::OutputEncoding
 
-# One PM tool store per leg. setup-pm exports HERMES_RUNTIME_DIR (its own
-# store) and HERMES_PYTHON for this job's tooling. A user's machine has one
-# store, <HERMES_HOME>\tools, and the desktop smoke already launches the app
-# that way (smoke-env.mjs drops every HERMES_* override). When install.ps1
-# and `hermes update` saw the job's store while the smoke did not, a leg
+# One PM tool store per leg. setup-pm exports KUBOT_RUNTIME_DIR (its own
+# store) and KUBOT_PYTHON for this job's tooling. A user's machine has one
+# store, <KUBOT_HOME>\tools, and the desktop smoke already launches the app
+# that way (smoke-env.mjs drops every KUBOT_* override). When install.ps1
+# and `kubot update` saw the job's store while the smoke did not, a leg
 # settled onto two stores and the update rewrote its own running launcher
 # ("source launcher publication failed"). No product step (installer, app,
 # update, chat) sees the job's variables; the driver keeps setup-pm only
 # through $DriverPython. PATH keeps setup-pm's tools, as older installers
 # expect uv/ripgrep there.
-$DriverPython = if ($env:HERMES_PYTHON) { $env:HERMES_PYTHON } else { (Get-Command python.exe -ErrorAction Stop).Source }
-foreach ($jobOnly in @('HERMES_RUNTIME_DIR', 'HERMES_PYTHON', 'VIRTUAL_ENV')) {
+$DriverPython = if ($env:KUBOT_PYTHON) { $env:KUBOT_PYTHON } else { (Get-Command python.exe -ErrorAction Stop).Source }
+foreach ($jobOnly in @('KUBOT_RUNTIME_DIR', 'KUBOT_PYTHON', 'VIRTUAL_ENV')) {
     if (Test-Path -LiteralPath "env:$jobOnly") { Remove-Item -LiteralPath "env:$jobOnly" }
 }
 
 if (-not $RepoRoot) {
     $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
-# The workflow's HERMES_E2E_WORKROOT is "<workspace>\..\hermes-desktop-gui-e2e".
-# Everything below derives HERMES_HOME (and so the PM store) from it, and a
-# user's HERMES_HOME has no ".." segment. With one, Windows reports the store
+# The workflow's KUBOT_E2E_WORKROOT is "<workspace>\..\kubot-desktop-gui-e2e".
+# Everything below derives KUBOT_HOME (and so the PM store) from it, and a
+# user's KUBOT_HOME has no ".." segment. With one, Windows reports the store
 # Python's sys.executable normalized while PM names it with the "..", and
 # prepare_launch() relaunched into the same interpreter forever (#122513).
 $WorkRoot = [System.IO.Path]::GetFullPath($WorkRoot)
 
 $ServeRepo   = Join-Path $WorkRoot "serve.git"
-$HermesHome  = Join-Path $WorkRoot "hermes-home"
-$InstallDir  = Join-Path $HermesHome "hermes-agent"
+$HermesHome  = Join-Path $WorkRoot "kubot-home"
+$InstallDir  = Join-Path $HermesHome "kubot-agent"
 $StatePath   = Join-Path $WorkRoot "shas.json"
 $ProofRoot   = Join-Path $WorkRoot "proof"
 $AhkDir      = Join-Path $WorkRoot "ahk"
 $AssetsDir   = Join-Path $PSScriptRoot "e2e-assets"
 if (-not $DriverNode) { $DriverNode = (Get-Command node.exe -ErrorAction Stop).Source }
-$env:HERMES_E2E_NODE = $DriverNode
-$env:HERMES_DESKTOP_USER_DATA_DIR = Join-Path $WorkRoot 'electron-user-data'
+$env:KUBOT_E2E_NODE = $DriverNode
+$env:KUBOT_DESKTOP_USER_DATA_DIR = Join-Path $WorkRoot 'electron-user-data'
 $script:ChatMock = $null
 $script:ChatFailure = $false
 . (Join-Path $AssetsDir 'desktop-smoke-windows.ps1')
@@ -179,7 +179,7 @@ function Invoke-DesktopCheckpoint([string]$ChatPhase, [string]$Commit, [string]$
     # The app must be able to detach its gateway, as from a user's launch (see Invoke-OutsideRunnerJob).
     $chatExit = Invoke-OutsideRunnerJob "desktop-$ChatPhase" $WorkRoot $DriverNode @(
         (Join-Path $AssetsDir 'source-desktop-smoke.mjs'),
-        '--root', $InstallDir, '--home', $HermesHome, '--user-data', $env:HERMES_DESKTOP_USER_DATA_DIR,
+        '--root', $InstallDir, '--home', $HermesHome, '--user-data', $env:KUBOT_DESKTOP_USER_DATA_DIR,
         '--out', $ProofRoot, '--phase', $ChatPhase, '--expect-commit', $Commit, '--desktop', $script:ExpectedDesktop, '--method', $Method)
     if ($chatExit -ne 0) { throw "Mandatory desktop chat $ChatPhase failed (exit $chatExit)" }
     $script:ChatFailure = $false
@@ -191,8 +191,8 @@ function Confirm-OldChat([string]$Out) {
     $script:ChatFailure = $false
 }
 
-$RepoUrlHttps = "https://github.com/NousResearch/hermes-agent.git"
-$RepoUrlSsh   = "git@github.com:NousResearch/hermes-agent.git"
+$RepoUrlHttps = "https://github.com/NousResearch/kubot-agent.git"
+$RepoUrlSsh   = "git@github.com:NousResearch/kubot-agent.git"
 
 function Write-Step([string]$Message) {
     Write-Host ""
@@ -217,7 +217,7 @@ function Invoke-Git([string[]]$GitArgs) {
     #
     # ALWAYS the real git.exe, never the shim we ship.
     # annoying bug where .bat files eat ^ args.
-    # if hermes ever adds a git command that calls something with ^ this will break, lol.
+    # if kubot ever adds a git command that calls something with ^ this will break, lol.
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -232,7 +232,7 @@ function Invoke-Git([string[]]$GitArgs) {
 }
 
 function Set-GitRedirect {
-    # we redirect to our own repo so we can play around with what commit hermes thinks we're on.
+    # we redirect to our own repo so we can play around with what commit kubot thinks we're on.
     # MECHANISM: a driver-owned global gitconfig selected via
     # GIT_CONFIG_GLOBAL. Do NOT use GIT_CONFIG_COUNT/KEY_n/VALUE_n env
     # config here -- install.ps1 SETS those itself (GIT_CONFIG_COUNT=1,
@@ -257,7 +257,7 @@ function Set-GitRedirect {
     $env:GIT_CONFIG_GLOBAL = $gitCfg
     # serve.git publishes commits on main, not releases: HEAD's installer would otherwise
     # install the latest stable release its tags name. Older installers ignore the variable.
-    $env:HERMES_INSTALL_CHANNEL = 'main'
+    $env:KUBOT_INSTALL_CHANNEL = 'main'
 
     # check it worked
     $actualGitUrl = Invoke-Git @("-C", $RepoRoot, "remote", "get-url", "origin")
@@ -281,7 +281,7 @@ function Set-GitRedirect {
         # the shim below is on PATH, `git` reports the official origin for
         # `remote get-url origin` (so fork detection sees it); any check that must
         # see the file:// redirect instead has to bypass the shim via this path.
-        $env:HERMES_E2E_REAL_GIT = $realGit
+        $env:KUBOT_E2E_REAL_GIT = $realGit
 
     if ($script:FreshMachine) {
         # A fresh Windows box has no git. install.ps1's Get-PinnedGit returns
@@ -361,8 +361,8 @@ function Get-InstalledHead {
 
 function Get-DesktopExe {
     foreach ($c in @(
-        (Join-Path $InstallDir "apps\desktop\release\win-unpacked\Hermes.exe"),
-        (Join-Path $InstallDir "apps\desktop\release\win-arm64-unpacked\Hermes.exe")
+        (Join-Path $InstallDir "apps\desktop\release\win-unpacked\Kubot.exe"),
+        (Join-Path $InstallDir "apps\desktop\release\win-arm64-unpacked\Kubot.exe")
     )) {
         if (Test-Path -LiteralPath $c) { return $c }
     }
@@ -379,9 +379,9 @@ function Save-InstallSideState([string]$Label) {
     New-Item -ItemType Directory -Path $dest -Force | Out-Null
     $logsDir = Join-Path $HermesHome "logs"
     if (Test-Path -LiteralPath $logsDir) {
-        Copy-Item $logsDir (Join-Path $dest "hermes-logs") -Recurse -Force -ErrorAction SilentlyContinue
+        Copy-Item $logsDir (Join-Path $dest "kubot-logs") -Recurse -Force -ErrorAction SilentlyContinue
     }
-    $resultFile = Join-Path $HermesHome ".hermes-update-result.json"
+    $resultFile = Join-Path $HermesHome ".kubot-update-result.json"
     if (Test-Path -LiteralPath $resultFile) {
         Copy-Item $resultFile $dest -Force -ErrorAction SilentlyContinue
     }
@@ -395,7 +395,7 @@ function Save-InstallSideState([string]$Label) {
     Get-ChildItem -LiteralPath $HermesHome -ErrorAction SilentlyContinue |
         Select-Object Name, Length, LastWriteTime |
         Format-Table -AutoSize | Out-String |
-        Set-Content (Join-Path $dest "hermes-home-ls.txt")
+        Set-Content (Join-Path $dest "kubot-home-ls.txt")
 }
 
 function Test-HermesRuns([string]$Label) {
@@ -404,10 +404,10 @@ function Test-HermesRuns([string]$Label) {
     try {
         $hermesExe = Get-SourceHermes $InstallDir
     } catch {
-        # A pre-handoff release cannot complete inside `hermes update`: its
+        # A pre-handoff release cannot complete inside `kubot update`: its
         # update path reaches no retired-hook seam, so the update ends with the
         # tree at HEAD and no published launcher. The NEXT ordinary startup
-        # completes it (hermes_bootstrap -> prepare_launch -> sync PM, publish
+        # completes it (kubot_bootstrap -> prepare_launch -> sync PM, publish
         # launchers, re-exec). Drive that startup here, WITHOUT the lazy-install
         # ban, and only when the launcher is missing -- so a healthy update is
         # still judged by the strict checks below, and `--version` probes keep
@@ -433,21 +433,21 @@ function Test-HermesRuns([string]$Label) {
     }
     & $DriverPython -B (Join-Path $AssetsDir 'source_driver.py') --root $InstallDir --launcher $hermesExe --desktop $script:ExpectedDesktop
     Assert-True ($LASTEXITCODE -eq 0) "$Label -- read-only install verification (no repair)"
-    $prevLazy = $env:HERMES_DISABLE_LAZY_INSTALLS
+    $prevLazy = $env:KUBOT_DISABLE_LAZY_INSTALLS
     $prevBytecode = $env:PYTHONDONTWRITEBYTECODE
     $prevEap = $ErrorActionPreference
     try {
-        $env:HERMES_DISABLE_LAZY_INSTALLS = '1'
+        $env:KUBOT_DISABLE_LAZY_INSTALLS = '1'
         $env:PYTHONDONTWRITEBYTECODE = '1'
         $ErrorActionPreference = 'Continue'
-        & $hermesExe --version 2>&1 | ForEach-Object { Write-Host "    hermes --version| $_" }
+        & $hermesExe --version 2>&1 | ForEach-Object { Write-Host "    kubot --version| $_" }
         $versionExit = $LASTEXITCODE
     } finally {
-        $env:HERMES_DISABLE_LAZY_INSTALLS = $prevLazy
+        $env:KUBOT_DISABLE_LAZY_INSTALLS = $prevLazy
         $env:PYTHONDONTWRITEBYTECODE = $prevBytecode
         $ErrorActionPreference = $prevEap
     }
-    Assert-True ($versionExit -eq 0) "$Label -- hermes --version exits 0"
+    Assert-True ($versionExit -eq 0) "$Label -- kubot --version exits 0"
 }
 
 # ----------------------------------------------------------------------------
@@ -542,15 +542,15 @@ function Invoke-HermesUpdate {
         $ErrorActionPreference = $prevEap
         Stop-HangWatchdog $watchdog
     }
-    Write-LogGroup "hermes update transcript" $log
+    Write-LogGroup "kubot update transcript" $log
     if (Test-Path -LiteralPath $hangLog) {
-        Write-LogGroup "hermes update hang evidence (process table, Python stacks)" $hangLog
-        throw "E2E ASSERTION FAILED: hermes update was still running after $UpdateDeadlineMinutes minutes (its output pipe never closed); the process table above shows which process held it"
+        Write-LogGroup "kubot update hang evidence (process table, Python stacks)" $hangLog
+        throw "E2E ASSERTION FAILED: kubot update was still running after $UpdateDeadlineMinutes minutes (its output pipe never closed); the process table above shows which process held it"
     }
-    Assert-True ($updateExit -eq 0) "hermes update exited $updateExit (expected 0)"
+    Assert-True ($updateExit -eq 0) "kubot update exited $updateExit (expected 0)"
 }
 
-# install.ps1 (with -IncludeDesktop) and `hermes update` normally finish in
+# install.ps1 (with -IncludeDesktop) and `kubot update` normally finish in
 # under 25 minutes. Past these deadlines the watchdog records every process
 # (pid, parent, start time, command line) plus a py-spy stack of each Python
 # process, then stops this leg's processes, so a hang fails with evidence --
@@ -584,12 +584,12 @@ function Start-HangWatchdog([int]$Minutes, [string]$EvidencePath) {
         })
         $lines = @("still running after $minutes minutes", '', "== descendants of the driver (pid $driverPid) ==")
         $lines += @($tree | ForEach-Object { & $row $_ })
-        $lines += @('', "== processes naming this leg's HERMES_HOME ==")
+        $lines += @('', "== processes naming this leg's KUBOT_HOME ==")
         $lines += @($leg | ForEach-Object { & $row $_ })
         $lines += @('', '== every process, oldest first ==')
         $lines += @($all | Sort-Object CreationDate | ForEach-Object { & $row $_ })
         if (Test-Path -LiteralPath $pyspy) {
-            foreach ($p in (@($tree) + @($leg) | Where-Object { $_.Name -match '^(python|pythonw|hermes)' } | Sort-Object ProcessId -Unique)) {
+            foreach ($p in (@($tree) + @($leg) | Where-Object { $_.Name -match '^(python|pythonw|kubot)' } | Sort-Object ProcessId -Unique)) {
                 $lines += @('', "== py-spy dump --pid $($p.ProcessId) ($($p.Name)) ==")
                 $lines += @(& $pyspy dump --pid $p.ProcessId --nonblocking 2>&1 | ForEach-Object { "$_" })
             }
@@ -613,11 +613,11 @@ function Stop-HangWatchdog($Job) {
 function Invoke-ManualCardUpdate([string]$ReceiptPath, [string]$TargetSha) {
     Assert-True (Test-Path -LiteralPath $ReceiptPath) "manual update card produced a receipt"
     $manual = Get-Content -LiteralPath $ReceiptPath -Raw | ConvertFrom-Json
-    Assert-True ($manual.command -match '^hermes update(?:\s|$)') "manual update card instructed hermes update"
+    Assert-True ($manual.command -match '^kubot update(?:\s|$)') "manual update card instructed kubot update"
     Invoke-HermesUpdate
     Assert-True ((Get-InstalledHead) -eq $TargetSha) "manual update landed on target commit"
     Test-HermesRuns "post-manual-update"
-    Assert-True ($null -ne (Get-DesktopExe)) "Hermes.exe still present after manual update"
+    Assert-True ($null -ne (Get-DesktopExe)) "Kubot.exe still present after manual update"
 }
 
 function Clear-HistoricalInstallerChurn {
@@ -672,7 +672,7 @@ function Clear-HistoricalInstallerChurn {
 }
 
 function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
-    # The hermes-desktop launch surface: `hermes desktop` runs its whole
+    # The kubot-desktop launch surface: `kubot desktop` runs its whole
     # real pipeline; the driver intercepts the product's final spawn
     # (argv/cwd/env captured by e2e-assets/launch-capture/sitecustomize.py)
     # and re-executes it under Playwright, which clicks Update now.
@@ -683,13 +683,13 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
 
     $capDir = Join-Path $AssetsDir "launch-capture"
     $prevPy = $env:PYTHONPATH
-    $prevCap = $env:HERMES_E2E_CAPTURE_LAUNCH
+    $prevCap = $env:KUBOT_E2E_CAPTURE_LAUNCH
     $env:PYTHONPATH = if ($prevPy) { "$capDir;$prevPy" } else { $capDir }
-    $env:HERMES_E2E_CAPTURE_LAUNCH = $spec
+    $env:KUBOT_E2E_CAPTURE_LAUNCH = $spec
     $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"
     Push-Location $InstallDir
     try {
-        if ($hermesExe.StartsWith((Join-Path $InstallDir '.hermes'), [StringComparison]::OrdinalIgnoreCase)) {
+        if ($hermesExe.StartsWith((Join-Path $InstallDir '.kubot'), [StringComparison]::OrdinalIgnoreCase)) {
             # The PM launcher runs its interpreter with -I, so PYTHONPATH never
             # imports sitecustomize. Same as installer-script-e2e.sh: ask the
             # launcher for its own isolated command and inject the hook into it.
@@ -703,10 +703,10 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
         Pop-Location
         $ErrorActionPreference = $prevEap
         $env:PYTHONPATH = $prevPy
-        $env:HERMES_E2E_CAPTURE_LAUNCH = $prevCap
+        $env:KUBOT_E2E_CAPTURE_LAUNCH = $prevCap
     }
-    Write-LogGroup "hermes desktop (launch capture) transcript" $log
-    Assert-True ($capExit -eq 0) "hermes desktop exited 0 during launch capture"
+    Write-LogGroup "kubot desktop (launch capture) transcript" $log
+    Assert-True ($capExit -eq 0) "kubot desktop exited 0 during launch capture"
     Assert-True (Test-Path -LiteralPath "$spec.captured") "a launch was actually captured (exit 0 without a launch must not pass)"
     Clear-HistoricalInstallerChurn
 
@@ -721,8 +721,8 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
         # runs the historical venv->PM takeover plus a full Desktop rebuild
         # (9m43s measured), like the 35 min open-app-update wait below.
         & $node (Join-Path $AssetsDir "launch-from-spec.mjs") --spec $spec `
-            --old-sha (Read-State).old --chat-out $chatOut --mock-url $env:HERMES_E2E_MOCK_URL `
-            --result (Join-Path $HermesHome ".hermes-update-result.json") `
+            --old-sha (Read-State).old --chat-out $chatOut --mock-url $env:KUBOT_E2E_MOCK_URL `
+            --result (Join-Path $HermesHome ".kubot-update-result.json") `
             --expect-sha $TargetSha --repo-dir $InstallDir --timeout-ms 1800000 2>&1 |
             ForEach-Object { Write-Host "  pw| $_" }
         $driveExit = $LASTEXITCODE
@@ -736,9 +736,9 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
         Invoke-ManualCardUpdate $manualReceipt $TargetSha
         return
     }
-    Assert-True ($driveExit -eq 0) "app driven via captured hermes desktop spec; update completed"
+    Assert-True ($driveExit -eq 0) "app driven via captured kubot desktop spec; update completed"
 
-    # The production updater relaunches Hermes. Close that verified window
+    # The production updater relaunches Kubot. Close that verified window
     # normally so the test-owned checkpoint starts and owns its own backend.
     $desktopExe = Get-DesktopExe
     $deadline = (Get-Date).AddMinutes(5)
@@ -753,21 +753,21 @@ function Invoke-HermesDesktopAppUpdate([string]$TargetSha) {
     Close-VerifiedDesktop $desktopExe $windows[0].Id
 }
 
-# Evidence for a GUI-driver failure, taken while the installer is still alive: which Hermes
-# processes exist (was Hermes.exe ever started, and by whom), the installer's thread states,
+# Evidence for a GUI-driver failure, taken while the installer is still alive: which Kubot
+# processes exist (was Kubot.exe ever started, and by whom), the installer's thread states,
 # and a full memory dump of the installer. The installer's tracing log is buffered and never
 # reaches disk when the job kills it; the dump still holds it. A Launch that left the
 # installer on LAUNCHING had no other trace (tests/install/e2e-assets/install-and-launch.ahk).
 function Save-GuiDriverFailureEvidence([System.Diagnostics.Process]$Installer, [string]$OutDir) {
     New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
     Get-CimInstance Win32_Process |
-        Where-Object { $_.Name -match '^(hermes|msedgewebview2|python|uv|git|node)' -or $_.ParentProcessId -eq $Installer.Id } |
+        Where-Object { $_.Name -match '^(kubot|msedgewebview2|python|uv|git|node)' -or $_.ParentProcessId -eq $Installer.Id } |
         Sort-Object CreationDate |
         Select-Object ProcessId, ParentProcessId, CreationDate, Name, CommandLine |
         Format-Table -AutoSize -Wrap | Out-String -Width 400 |
         Tee-Object -FilePath (Join-Path $OutDir "processes.txt") | Write-Host
     if ($Installer.HasExited) {
-        Write-Host "  Hermes-Setup.exe already exited (code $($Installer.ExitCode) at $($Installer.ExitTime))"
+        Write-Host "  Kubot-Setup.exe already exited (code $($Installer.ExitCode) at $($Installer.ExitTime))"
         return
     }
     $Installer.Refresh()
@@ -781,7 +781,7 @@ function Save-GuiDriverFailureEvidence([System.Diagnostics.Process]$Installer, [
 public static extern bool MiniDumpWriteDump(IntPtr hProcess, uint processId, Microsoft.Win32.SafeHandles.SafeFileHandle hFile, uint dumpType, IntPtr exceptionParam, IntPtr userStreamParam, IntPtr callbackParam);
 '@
     }
-    $dumpPath = Join-Path $OutDir "Hermes-Setup.dmp"
+    $dumpPath = Join-Path $OutDir "Kubot-Setup.dmp"
     $file = [System.IO.File]::Create($dumpPath)
     try {
         # MiniDumpWithFullMemory | MiniDumpWithHandleData | MiniDumpWithThreadInfo
@@ -791,8 +791,8 @@ public static extern bool MiniDumpWriteDump(IntPtr hProcess, uint processId, Mic
     finally {
         $file.Close()
     }
-    if ($ok) { Write-Host "  Hermes-Setup.exe dump: $dumpPath ($([math]::Round((Get-Item $dumpPath).Length / 1MB, 1)) MB)" }
-    else { Write-Host "  Hermes-Setup.exe dump failed (Win32 error $err)" }
+    if ($ok) { Write-Host "  Kubot-Setup.exe dump: $dumpPath ($([math]::Round((Get-Item $dumpPath).Length / 1MB, 1)) MB)" }
+    else { Write-Host "  Kubot-Setup.exe dump failed (Win32 error $err)" }
 }
 
 function Save-DesktopScreenshot([string]$OutFile) {
@@ -849,13 +849,13 @@ function Stop-DesktopRecorder($proc, [string]$OutDir) {
 
 function Stop-HermesAppProcesses([string]$Label) {
     # Close the desktop app the blunt way between phases (a user quitting).
-    # Only Hermes.exe (Electron) -- never hermes.exe (the venv CLI shim).
-    $procs = @(Get-Process -Name "Hermes" -ErrorAction SilentlyContinue)
+    # Only Kubot.exe (Electron) -- never kubot.exe (the venv CLI shim).
+    $procs = @(Get-Process -Name "Kubot" -ErrorAction SilentlyContinue)
     foreach ($p in $procs) {
         try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch {}
     }
     if ($procs.Count -gt 0) {
-        Write-Host "  [$Label] stopped $($procs.Count) Hermes.exe process(es)"
+        Write-Host "  [$Label] stopped $($procs.Count) Kubot.exe process(es)"
         Start-Sleep -Seconds 3
     }
 }
@@ -876,13 +876,13 @@ function New-NextCommit([string]$Repo, [string]$Parent) {
     $saved = @{}
     $vars = @{
         GIT_INDEX_FILE = (Join-Path $WorkRoot "next.index")
-        GIT_AUTHOR_NAME = "Hermes E2E"; GIT_AUTHOR_EMAIL = "e2e@hermes.invalid"
-        GIT_COMMITTER_NAME = "Hermes E2E"; GIT_COMMITTER_EMAIL = "e2e@hermes.invalid"
+        GIT_AUTHOR_NAME = "Kubot E2E"; GIT_AUTHOR_EMAIL = "e2e@kubot.invalid"
+        GIT_COMMITTER_NAME = "Kubot E2E"; GIT_COMMITTER_EMAIL = "e2e@kubot.invalid"
     }
     foreach ($k in $vars.Keys) { $saved[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $vars[$k]) }
     try {
         Invoke-Git @("-C", $Repo, "read-tree", $Parent) | Out-Null
-        Invoke-Git @("-C", $Repo, "update-index", "--add", "--cacheinfo", "100644,$blob,.hermes-e2e-next") | Out-Null
+        Invoke-Git @("-C", $Repo, "update-index", "--add", "--cacheinfo", "100644,$blob,.kubot-e2e-next") | Out-Null
         $tree = Invoke-Git @("-C", $Repo, "write-tree")
         return Invoke-Git @("-C", $Repo, "commit-tree", $tree, "-p", $Parent, "-m", "e2e: synthetic next commit")
     } finally {
@@ -948,7 +948,7 @@ function Invoke-PhaseStage {
 }
 
 # ----------------------------------------------------------------------------
-# Phase: install-gui -- website Hermes-Setup.exe, headed, AHK-driven
+# Phase: install-gui -- website Kubot-Setup.exe, headed, AHK-driven
 # ----------------------------------------------------------------------------
 function Invoke-PhaseInstallGui {
     param(
@@ -963,7 +963,7 @@ function Invoke-PhaseInstallGui {
         $ExpectedSha = $state.old
         $ExpectedLabel = "OLD ($($state.old_ref))"
     }
-    Write-Step "$($Mode.ToUpper()) (GUI): Hermes-Setup.exe from the website, headed, AHK clicks"
+    Write-Step "$($Mode.ToUpper()) (GUI): Kubot-Setup.exe from the website, headed, AHK clicks"
     $proof = Join-Path $ProofRoot $(if ($Mode -eq "install") { "install-gui" } else { "update-gui-installer" })
     New-Item -ItemType Directory -Path $proof -Force | Out-Null
 
@@ -988,12 +988,12 @@ function Invoke-PhaseInstallGui {
     ) | Set-Content -LiteralPath (Join-Path $proof "bootstrap-install-script.txt") -Encoding ASCII
     Write-Host "  bootstrap script is scripts/install.ps1 from $ExpectedLabel ($ExpectedSha)"
 
-    $setupExe = Join-Path $WorkRoot "Hermes-Setup.exe"
+    $setupExe = Join-Path $WorkRoot "Kubot-Setup.exe"
     if (-not (Test-Path -LiteralPath $setupExe)) {
         Write-Host "  downloading $SetupExeUrl"
         Invoke-WebRequest -Uri $SetupExeUrl -OutFile $setupExe
     }
-    Assert-True ((Get-Item $setupExe).Length -gt 1MB) "Hermes-Setup.exe downloaded ($([math]::Round((Get-Item $setupExe).Length / 1MB, 1)) MB)"
+    Assert-True ((Get-Item $setupExe).Length -gt 1MB) "Kubot-Setup.exe downloaded ($([math]::Round((Get-Item $setupExe).Length / 1MB, 1)) MB)"
 
     # AutoHotkey v2, portable zip (no installer, no winget flakes).
     $ahkExe = Join-Path $AhkDir "AutoHotkey64.exe"
@@ -1008,7 +1008,7 @@ function Invoke-PhaseInstallGui {
     # relative to the script dir).
     Copy-Item -Path (Join-Path $AssetsDir "install-and-launch.ahk"), (Join-Path $AssetsDir "install-button.png"), (Join-Path $AssetsDir "launch-button.png") -Destination $AhkDir -Force
 
-    $env:HERMES_HOME = $HermesHome
+    $env:KUBOT_HOME = $HermesHome
     New-Item -ItemType Directory -Path $HermesHome -Force | Out-Null
     # The installer launches the app, and a fresh desktop install opens the first-run
     # onboarding chat with a live model turn that can hold the window open past the
@@ -1025,26 +1025,26 @@ function Invoke-PhaseInstallGui {
 
         # Launch the real headed installer. Scope the paired script source to
         # this process only so later product launches cannot inherit it.
-        $previousSetupSource = $env:HERMES_SETUP_DEV_REPO_ROOT
-        $env:HERMES_SETUP_DEV_REPO_ROOT = $bootstrapRoot
+        $previousSetupSource = $env:KUBOT_SETUP_DEV_REPO_ROOT
+        $env:KUBOT_SETUP_DEV_REPO_ROOT = $bootstrapRoot
         try {
             $installer = Start-Process -FilePath $setupExe -PassThru
         }
         finally {
             if ($null -eq $previousSetupSource) {
-                Remove-Item Env:HERMES_SETUP_DEV_REPO_ROOT -ErrorAction SilentlyContinue
+                Remove-Item Env:KUBOT_SETUP_DEV_REPO_ROOT -ErrorAction SilentlyContinue
             }
             else {
-                $env:HERMES_SETUP_DEV_REPO_ROOT = $previousSetupSource
+                $env:KUBOT_SETUP_DEV_REPO_ROOT = $previousSetupSource
             }
         }
-        Write-Host "  Hermes-Setup.exe launched (pid $($installer.Id))"
+        Write-Host "  Kubot-Setup.exe launched (pid $($installer.Id))"
 
-        # Drive it: Install click -> wait -> Launch click -> Hermes.exe window.
+        # Drive it: Install click -> wait -> Launch click -> Kubot.exe window.
         # Arg 3 lets the AHK script use the installer's own log as the
         # install-finished fallback signal.
         $ahk = Start-Process -FilePath $ahkExe `
-            -ArgumentList (Join-Path $AhkDir "install-and-launch.ahk"), $ahkLog, "Hermes-Setup.exe", (Join-Path $HermesHome "logs\bootstrap-installer.log") `
+            -ArgumentList (Join-Path $AhkDir "install-and-launch.ahk"), $ahkLog, "Kubot-Setup.exe", (Join-Path $HermesHome "logs\bootstrap-installer.log") `
             -PassThru
         # Install on a cold runner takes a while; the AHK script's own inner
         # timeout (45 min on the Launch wait) is the effective budget.
@@ -1066,13 +1066,13 @@ function Invoke-PhaseInstallGui {
 
         # The Launch hand-off under test: the app the installer spawned must
         # actually be running.
-        Assert-True ($null -ne (Get-Process -Name "Hermes" -ErrorAction SilentlyContinue)) "Hermes.exe process is running (installer Launch hand-off worked)"
+        Assert-True ($null -ne (Get-Process -Name "Kubot" -ErrorAction SilentlyContinue)) "Kubot.exe process is running (installer Launch hand-off worked)"
 
         # Installer should have exited after Launch.
         if (-not $installer.HasExited) {
             Start-Sleep -Seconds 10
         }
-        Assert-True $installer.HasExited "Hermes-Setup.exe exited after Launch"
+        Assert-True $installer.HasExited "Kubot-Setup.exe exited after Launch"
     }
     finally {
         Stop-DesktopRecorder $recorder (Join-Path $proof "desktop-frames")
@@ -1095,7 +1095,7 @@ function Invoke-PhaseInstallGui {
         Assert-True ($installedSha -ne $state.current) "installed checkout differs from HEAD (an update is genuinely available)"
     }
     Test-HermesRuns "post-$Mode-gui"
-    Assert-True ($null -ne (Get-DesktopExe)) "packaged Desktop Hermes.exe exists"
+    Assert-True ($null -ne (Get-DesktopExe)) "packaged Desktop Kubot.exe exists"
 
     # The installer Launch proof above must pass before a test-owned launch.
     $script:ChatFailure = $true
@@ -1105,10 +1105,10 @@ function Invoke-PhaseInstallGui {
     # default OpenRouter choice and override the mock on the checkpoint relaunch.
     # Reset only this driver-owned pre-checkpoint state; OLD -> HEAD keeps the
     # state created by the checkpoint itself.
-    if (Test-Path -LiteralPath $env:HERMES_DESKTOP_USER_DATA_DIR) {
-        Remove-Item -LiteralPath $env:HERMES_DESKTOP_USER_DATA_DIR -Recurse -Force
+    if (Test-Path -LiteralPath $env:KUBOT_DESKTOP_USER_DATA_DIR) {
+        Remove-Item -LiteralPath $env:KUBOT_DESKTOP_USER_DATA_DIR -Recurse -Force
     }
-    New-Item -ItemType Directory -Path $env:HERMES_DESKTOP_USER_DATA_DIR -Force | Out-Null
+    New-Item -ItemType Directory -Path $env:KUBOT_DESKTOP_USER_DATA_DIR -Force | Out-Null
     $chatPhase = if ($Mode -eq 'install') { 'old' } else { 'new' }
     @{ phase=$chatPhase; launch='post-installer-launch'; handoffProof=$proof } | ConvertTo-Json |
         Set-Content (Join-Path $ProofRoot "desktop-chat-$chatPhase-launch.json")
@@ -1123,7 +1123,7 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
     $proof = Join-Path $ProofRoot "update-gui"
     New-Item -ItemType Directory -Path $proof -Force | Out-Null
 
-    $env:HERMES_HOME = $HermesHome
+    $env:KUBOT_HOME = $HermesHome
 
     # The update becomes available the way it does for a real user: the
     # remote's main moves forward. (Install ran against main = OLD.)
@@ -1131,10 +1131,10 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
     Write-Host "  serve.git main advanced to $TargetSha"
 
     $desktopExe = Get-DesktopExe
-    Assert-True ($null -ne $desktopExe) "packaged Hermes.exe present before update"
+    Assert-True ($null -ne $desktopExe) "packaged Kubot.exe present before update"
 
-    $resultPath = Join-Path $HermesHome ".hermes-update-result.json"
-    $markerPath = Join-Path $HermesHome ".hermes-update-in-progress"
+    $resultPath = Join-Path $HermesHome ".kubot-update-result.json"
+    $markerPath = Join-Path $HermesHome ".kubot-update-in-progress"
     Remove-Item -LiteralPath $resultPath -Force -ErrorAction SilentlyContinue
 
     $node = $DriverNode
@@ -1167,14 +1167,14 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
         Assert-True ($driveExit -eq 0) "GUI driver clicked Update now and the app quit for hand-off"
 
         # The detached updater (spawned by the app, NOT by us) now runs
-        # `hermes update` + desktop rebuild + relaunch. Which updater depends
+        # `kubot update` + desktop rebuild + relaunch. Which updater depends
         # on the installed checkout, and BOTH are production paths:
         #   * checkouts shipping scripts/desktop-update.ps1 -> that script,
-        #     which writes .hermes-update-result.json on every exit;
-        #   * older checkouts -> the staged hermes-setup.exe --update flow,
+        #     which writes .kubot-update-result.json on every exit;
+        #   * older checkouts -> the staged kubot-setup.exe --update flow,
         #     which does NOT write the result JSON.
         # So: poll for COMPLETION = (result JSON) OR (checkout reached the
-        # target sha AND the marker is gone). The sha/marker/hermes/relaunch
+        # target sha AND the marker is gone). The sha/marker/kubot/relaunch
         # asserts below are the hard gate either way; the JSON is asserted
         # only when the script path produced it.
         #
@@ -1222,26 +1222,26 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
 
         Assert-True ((Get-InstalledHead) -eq $TargetSha) "checkout landed on target commit"
         Test-HermesRuns "post-update"
-        Assert-True ($null -ne (Get-DesktopExe)) "Hermes.exe still present after update"
+        Assert-True ($null -ne (Get-DesktopExe)) "Kubot.exe still present after update"
 
         # The production hand-off relaunches the desktop (RelaunchExe).
         # A relaunched window is the user-visible proof the update loop closed.
-        Write-Host "  waiting for the relaunched Hermes.exe ..."
+        Write-Host "  waiting for the relaunched Kubot.exe ..."
         $rDeadline = (Get-Date).AddMinutes(5)
         $relaunched = $null
         while ((Get-Date) -lt $rDeadline) {
-            $relaunched = Get-Process -Name "Hermes" -ErrorAction SilentlyContinue
+            $relaunched = Get-Process -Name "Kubot" -ErrorAction SilentlyContinue
             if ($relaunched) { break }
             Start-Sleep -Seconds 5
         }
         Assert-True ($null -ne $relaunched) "updater relaunched the desktop app"
         Start-Sleep -Seconds 12   # let the window paint for the screenshot
-        # Foreground the relaunched Hermes window so the proof screenshot
+        # Foreground the relaunched Kubot window so the proof screenshot
         # captures IT, not whatever else is on top (the full-desktop grab is
         # otherwise at the mercy of z-order -- an earlier run caught VS Code).
         $mainProc = $null
         try {
-            $mainProc = Get-Process -Name "Hermes" -ErrorAction SilentlyContinue |
+            $mainProc = Get-Process -Name "Kubot" -ErrorAction SilentlyContinue |
                 Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
             if ($mainProc) {
                 Add-Type -Namespace HdE2E -Name Win -MemberDefinition @'
@@ -1340,20 +1340,20 @@ except Exception:
 function Invoke-UserStateActions {
     # Everything here is a command a user would run against the real installed
     # CLI with a real (mocked-inference) provider configured.
-    $hermes = Get-SourceHermes $InstallDir
+    $kubot = Get-SourceHermes $InstallDir
     if (-not $script:ChatMock) {
         # Same mock + config writer the desktop chat checkpoints use, so the
         # leg has a genuinely configured provider rather than a dummy key.
         $script:ChatMock = Start-DesktopJourneyMock $DriverNode $AssetsDir $WorkRoot $HermesHome $ProofRoot
     }
-    $prevLazy = $env:HERMES_DISABLE_LAZY_INSTALLS
+    $prevLazy = $env:KUBOT_DISABLE_LAZY_INSTALLS
     $prevEap = $ErrorActionPreference
     try {
-        $env:HERMES_DISABLE_LAZY_INSTALLS = '1'
+        $env:KUBOT_DISABLE_LAZY_INSTALLS = '1'
         $ErrorActionPreference = 'Continue'
 
         # Probe, do not assume (the harness rule for old refs).
-        $chatHelp = (& $hermes chat --help 2>&1 | Out-String)
+        $chatHelp = (& $kubot chat --help 2>&1 | Out-String)
         if (-not ($chatHelp -match '(^|\s)-q(\s|,|$)' -or $chatHelp -match '--quiet')) {
             throw 'the installed CLI has no one-shot chat flag; this leg cannot produce a session through the user path'
         }
@@ -1369,7 +1369,7 @@ function Invoke-UserStateActions {
         # a console screen buffer: piping the CLI's stdout into the log takes that away
         # and the turn dies with NoConsoleScreenBufferError. Run it under a real
         # pseudoconsole (pty-run.py) and keep the capture.
-        & $DriverPython -B (Join-Path $AssetsDir 'pty-run.py') --out $log --timeout 300 -- $hermes chat -q "Reply with the single word: ok" @oneshot
+        & $DriverPython -B (Join-Path $AssetsDir 'pty-run.py') --out $log --timeout 300 -- $kubot chat -q "Reply with the single word: ok" @oneshot
         $chatExit = $LASTEXITCODE
         Write-LogGroup 'first real chat turn' $log
         if ($chatExit -eq 124) {
@@ -1389,9 +1389,9 @@ function Invoke-UserStateActions {
         if (-not (Test-Path -LiteralPath (Join-Path $HermesHome 'auth.json'))) {
             # A starting tag may not have this subcommand yet: a harness
             # limitation, not a preservation failure.
-            & $hermes auth add --help *> $null
+            & $kubot auth add --help *> $null
             if ($LASTEXITCODE -ne 0) {
-                Write-Host '  SKIP hermes auth add does not exist on this ref; auth.json is not covered by this leg'
+                Write-Host '  SKIP kubot auth add does not exist on this ref; auth.json is not covered by this leg'
             }
             else {
             # The provider id and the flags are vintage surfaces, so probe them
@@ -1402,13 +1402,13 @@ function Invoke-UserStateActions {
             # first provider the installed CLI accepts.
             $authLog = Join-Path $WorkRoot 'logs\user-state-auth.log'
             $labelFlags = @()
-            if ((& $hermes auth add --help 2>&1 | Out-String) -match '--label') {
+            if ((& $kubot auth add --help 2>&1 | Out-String) -match '--label') {
                 $labelFlags = @('--label', 'e2e-preservation')
             }
             $added = $false
             foreach ($provider in @('openrouter', 'anthropic')) {
-                Add-Content -LiteralPath $authLog -Value "=== hermes auth add $provider ==="
-                & $hermes auth add $provider --type api-key `
+                Add-Content -LiteralPath $authLog -Value "=== kubot auth add $provider ==="
+                & $kubot auth add $provider --type api-key `
                     --api-key 'e2e-preservation-not-a-real-key' @labelFlags 2>&1 |
                     Out-File -Encoding UTF8 -Append $authLog
                 if (Test-Path -LiteralPath (Join-Path $HermesHome 'auth.json')) {
@@ -1417,7 +1417,7 @@ function Invoke-UserStateActions {
                 }
             }
             if (-not $added) {
-                throw "hermes auth add failed for openrouter and anthropic; see $authLog"
+                throw "kubot auth add failed for openrouter and anthropic; see $authLog"
             }
             Write-Host '  a pooled credential exists (auth.json)'
             }
@@ -1427,16 +1427,16 @@ function Invoke-UserStateActions {
             # Same vintage surface as auth add above: a starting tag may predate
             # the profile command entirely, and that is a harness limitation,
             # not a preservation failure.
-            & $hermes profile create --help *> $null
+            & $kubot profile create --help *> $null
             if ($LASTEXITCODE -ne 0) {
-                Write-Host '  SKIP hermes profile create does not exist on this ref; profiles/e2e-second is not covered by this leg'
+                Write-Host '  SKIP kubot profile create does not exist on this ref; profiles/e2e-second is not covered by this leg'
             }
             else {
-            & $hermes profile create e2e-second 2>&1 |
+            & $kubot profile create e2e-second 2>&1 |
                 Out-File -Encoding UTF8 (Join-Path $WorkRoot 'logs\user-state-profile.log')
-            if ($LASTEXITCODE -ne 0) { throw 'hermes profile create failed' }
+            if ($LASTEXITCODE -ne 0) { throw 'kubot profile create failed' }
             if (-not (Test-Path -LiteralPath (Join-Path $HermesHome 'profiles\e2e-second'))) {
-                throw 'hermes profile create produced no profile dir'
+                throw 'kubot profile create produced no profile dir'
             }
             # Factory templates migrate intentionally; preserve an authored profile instead.
             Add-Content -LiteralPath (Join-Path $HermesHome 'profiles\e2e-second\SOUL.md') `
@@ -1446,7 +1446,7 @@ function Invoke-UserStateActions {
         }
     }
     finally {
-        $env:HERMES_DISABLE_LAZY_INSTALLS = $prevLazy
+        $env:KUBOT_DISABLE_LAZY_INSTALLS = $prevLazy
         $ErrorActionPreference = $prevEap
     }
 }
@@ -1479,16 +1479,16 @@ function Invoke-UserStateVerify {
 }
 
 function Assert-RedirectIsTransportOnly {
-    # The redirect must stay at TRANSPORT level: `hermes update` resolves its
+    # The redirect must stay at TRANSPORT level: `kubot update` resolves its
     # channel from the release archive and validates the record against
     # `git config --get remote.origin.url`. If the configured URL ever looked
     # like the rehearsal source, channel resolution would fail and this leg
     # would be testing a fork install rather than the real user path.
-    $official = @('https://github.com/NousResearch/hermes-agent.git',
-                  'git@github.com:NousResearch/hermes-agent.git')
+    $official = @('https://github.com/NousResearch/kubot-agent.git',
+                  'git@github.com:NousResearch/kubot-agent.git')
     $configured = (Invoke-Git @('-C', $InstallDir, 'config', '--get', 'remote.origin.url') | Out-String).Trim()
     Assert-True ($official -contains $configured) "origin stays configured as an official URL (got '$configured')"
-    $real = if ($env:HERMES_E2E_REAL_GIT) { $env:HERMES_E2E_REAL_GIT } else { 'git' }
+    $real = if ($env:KUBOT_E2E_REAL_GIT) { $env:KUBOT_E2E_REAL_GIT } else { 'git' }
     $observed = (& $real -C $InstallDir remote get-url origin 2>$null | Out-String).Trim()
     Assert-True ($observed -match 'serve\.git|^file://') "git transport is redirected to the staged repo (got '$observed')"
 }
@@ -1496,10 +1496,10 @@ function Assert-RedirectIsTransportOnly {
 function Assert-UserShims {
     # A launcher left pointing at a vanished tree is the "update lost
     # something" shape a checkout-hash assertion cannot see.
-    $hermes = Get-SourceHermes $InstallDir
-    Assert-True (Test-Path -LiteralPath $hermes) "a usable launcher still exists after the upgrade ($hermes)"
-    $userShim = Join-Path $HermesHome 'bin\hermes.exe'
-    if (-not (Test-Path -LiteralPath $userShim)) { $userShim = Join-Path $HermesHome 'bin\hermes.cmd' }
+    $kubot = Get-SourceHermes $InstallDir
+    Assert-True (Test-Path -LiteralPath $kubot) "a usable launcher still exists after the upgrade ($kubot)"
+    $userShim = Join-Path $HermesHome 'bin\kubot.exe'
+    if (-not (Test-Path -LiteralPath $userShim)) { $userShim = Join-Path $HermesHome 'bin\kubot.cmd' }
     if (Test-Path -LiteralPath $userShim) {
         $prevEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try {
@@ -1529,7 +1529,7 @@ function Assert-UserShims {
 
 function Invoke-PhaseInstall {
     # Dispatch on the install axis. Each arm ends with the same contract:
-    # checkout at OLD, hermes runs, and state carries how OLD landed so any
+    # checkout at OLD, kubot runs, and state carries how OLD landed so any
     # update arm can follow any install arm.
     $state = Read-State
     $script:ExpectedDesktop = if ($InstallMethod -eq 'installer-script') { 'absent' } else { 'present' }
@@ -1537,7 +1537,7 @@ function Invoke-PhaseInstall {
     # looks like a fork to the updater, whose "add the official repo as
     # upstream?" prompt would hang a headless run - the marker is the
     # product's own suppression mechanism.
-    $env:HERMES_HOME = $HermesHome
+    $env:KUBOT_HOME = $HermesHome
     New-Item -ItemType Directory -Path $HermesHome -Force | Out-Null
     switch ($InstallMethod) {
         "desktop-installer@latest" {
@@ -1567,9 +1567,9 @@ function Invoke-PhaseInstall {
 function Invoke-PhaseUpdate {
     $state = Read-State
     $script:ExpectedDesktop = if ($InstallMethod -ne 'installer-script' -or $Route -in @(
-        'installer-script+desktop', 'desktop-installer@latest', 'open-app-update', 'hermes-desktop-app-update'
+        'installer-script+desktop', 'desktop-installer@latest', 'open-app-update', 'kubot-desktop-app-update'
     )) { 'present' } else { 'absent' }
-    $env:HERMES_HOME = $HermesHome
+    $env:KUBOT_HOME = $HermesHome
     # Match the POSIX driver's explicit opt-out when a detached updater bypasses
     # the PATH shim and sees our local transport as a fork.
     New-Item -ItemType File -Path (Join-Path $HermesHome ".skip_upstream_prompt") -Force | Out-Null
@@ -1580,7 +1580,7 @@ function Invoke-PhaseUpdate {
     # helper used to own this step.
     # The mock provider is journey setup, not an upgrade mutation. Configure it
     # before preservation snapshots so its stable endpoint is part of baseline state.
-    if ($Route -in @('open-app-update', 'hermes-desktop-app-update', 'desktop-installer@latest')) {
+    if ($Route -in @('open-app-update', 'kubot-desktop-app-update', 'desktop-installer@latest')) {
         Start-JourneyChat
     }
     Set-SourceMainChannel $InstallDir
@@ -1600,10 +1600,10 @@ function Invoke-PhaseUpdate {
             # pairs are dispatched.
             Invoke-GuiUpdateDesktopRoute $state.current
         }
-        "hermes-desktop-app-update" {
+        "kubot-desktop-app-update" {
             Invoke-HermesDesktopAppUpdate $state.current
         }
-        "hermes-update" {
+        "kubot-update" {
             Invoke-HermesUpdate
         }
         "installer-script" {
@@ -1615,7 +1615,7 @@ function Invoke-PhaseUpdate {
             Assert-DesktopArtifact "HEAD"
         }
         "desktop-installer@latest" {
-            # A user re-downloading Hermes-Setup.exe and clicking Install over
+            # A user re-downloading Kubot-Setup.exe and clicking Install over
             # the existing install (the GUI twin of re-running the one-liner).
             # Windows has no already-installed fast path, so the full installer
             # UI shows and the same AHK drive applies; install.ps1's repository
@@ -1679,7 +1679,7 @@ function Invoke-PhaseVerifyStamp {
     $head = Get-InstalledHead
     Assert-True ($head -match '^[0-9a-f]{40}$') "installed HEAD readable: '$head'"
     Write-Host "  install HEAD: $($head.Substring(0, 12))"
-    $stampPath = Join-Path $InstallDir '.hermes-bootstrap-complete'
+    $stampPath = Join-Path $InstallDir '.kubot-bootstrap-complete'
     # FAIL lines go to stderr; under "Stop", PowerShell 5.1 would throw on the first one.
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
@@ -1690,12 +1690,12 @@ function Invoke-PhaseVerifyStamp {
     } finally { $ErrorActionPreference = $prevEap }
     $verdict | ForEach-Object { Write-Host $_ }
     if ($verifyExit -eq 0) { return }
-    # Permanent legacy shape, not a pending fix: the released Hermes-Setup.exe
+    # Permanent legacy shape, not a pending fix: the released Kubot-Setup.exe
     # replaces install.ps1's receipt with its own (#124949): "completedAtUnix"
     # (epoch seconds) instead of "completedAt", and a null pinnedCommit when git
     # is not on PATH. #125053 fixed the writer, but the installer .exe is not
     # rebuilt, so every Desktop-installer machine carries this receipt until the
-    # next `hermes update` rewrites it (hermes_cli/source_stamp.py). No reader
+    # next `kubot update` rewrites it (kubot_cli/source_stamp.py). No reader
     # depends on those two fields: Desktop's launch gate is runtime usability,
     # and the receipt's other readers check only that it exists. So the contract
     # for that shape is: exactly those two FAIL lines, an integer
@@ -1707,10 +1707,10 @@ function Invoke-PhaseVerifyStamp {
     $setupExeReceipt = $receipt -and ($receipt.PSObject.Properties.Name -contains 'completedAtUnix')
     if ($setupExeReceipt -and $fails.Count -and -not @($fails | Where-Object { $_ -notmatch $legacyOnly }).Count) {
         $unix = $receipt.completedAtUnix
-        Assert-True ((($unix -is [int]) -or ($unix -is [long])) -and $unix -gt 0) "Hermes-Setup.exe receipt completedAtUnix is epoch seconds: '$unix'"
+        Assert-True ((($unix -is [int]) -or ($unix -is [long])) -and $unix -gt 0) "Kubot-Setup.exe receipt completedAtUnix is epoch seconds: '$unix'"
         # The receipt cannot vouch for the commit, so the checkout must.
         Assert-True ($head -eq $state.current) "installed checkout is at the expected commit ($($state.current.Substring(0, 12)))"
-        $note = "Hermes-Setup.exe legacy receipt accepted (#124949; the released exe is not rebuilt): $($fails -join '; ')"
+        $note = "Kubot-Setup.exe legacy receipt accepted (#124949; the released exe is not rebuilt): $($fails -join '; ')"
         Write-Host "  $note"
         if ($env:GITHUB_STEP_SUMMARY) { Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $note -Encoding UTF8 }
         return

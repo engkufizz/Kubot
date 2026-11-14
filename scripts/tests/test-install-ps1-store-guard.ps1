@@ -8,10 +8,10 @@
 # HermesHome nested inside -InstallDir) makes the pm tool store land at
 # <InstallDir>\tools, INSIDE the checkout. Two failures follow: the
 # repository stage's occupied-directory preflight refuses every retry after
-# the first run populated the folder ("exists and is not a Hermes git
+# the first run populated the folder ("exists and is not a Kubot git
 # checkout"), and `git stash --include-untracked` would sweep the toolchain
 # into the stash. The installer now refuses the combination up front, before
-# any download, unless HERMES_RUNTIME_DIR parks the store elsewhere.
+# any download, unless KUBOT_RUNTIME_DIR parks the store elsewhere.
 #
 # HOW THIS RUNS THE CODE: by executing install.ps1 as a real subprocess with
 # crafted -HermesHome / -InstallDir arguments. -ShowResolvedPaths is a
@@ -52,18 +52,18 @@ function Invoke-ResolvedPaths {
 
     $psExe = (Get-Process -Id $PID).Path
     $outFile = [System.IO.Path]::GetTempFileName()
-    $savedRuntimeDir = [Environment]::GetEnvironmentVariable('HERMES_RUNTIME_DIR')
-    $savedHermesHome = [Environment]::GetEnvironmentVariable('HERMES_HOME')
+    $savedRuntimeDir = [Environment]::GetEnvironmentVariable('KUBOT_RUNTIME_DIR')
+    $savedHermesHome = [Environment]::GetEnvironmentVariable('KUBOT_HOME')
     try {
         if ($null -eq $savedRuntimeDir) {
-            Remove-Item Env:HERMES_RUNTIME_DIR -ErrorAction SilentlyContinue
+            Remove-Item Env:KUBOT_RUNTIME_DIR -ErrorAction SilentlyContinue
         } else {
-            $env:HERMES_RUNTIME_DIR = $savedRuntimeDir
+            $env:KUBOT_RUNTIME_DIR = $savedRuntimeDir
         }
         if ($null -eq $savedHermesHome) {
-            Remove-Item Env:HERMES_HOME -ErrorAction SilentlyContinue
+            Remove-Item Env:KUBOT_HOME -ErrorAction SilentlyContinue
         } else {
-            $env:HERMES_HOME = $savedHermesHome
+            $env:KUBOT_HOME = $savedHermesHome
         }
         $callArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $installScript) + $ExtraArgs + @('-ShowResolvedPaths')
         $prevEAP = $ErrorActionPreference
@@ -76,25 +76,25 @@ function Invoke-ResolvedPaths {
         }
         $exitCode = $LASTEXITCODE
         $raw = @(Get-Content -LiteralPath $outFile -ErrorAction SilentlyContinue)
-        $stdout = ($raw | Where-Object { $_ -notlike '`[hermes`]*' }) -join "`n"
-        $stderr = ($raw | Where-Object { $_ -like '`[hermes`]*' -or $_ -match 'HermesHome|install directory|tool store' }) -join "`n"
+        $stdout = ($raw | Where-Object { $_ -notlike '`[kubot`]*' }) -join "`n"
+        $stderr = ($raw | Where-Object { $_ -like '`[kubot`]*' -or $_ -match 'HermesHome|install directory|tool store' }) -join "`n"
         return @{ ExitCode = $exitCode; Stdout = $stdout; All = ($raw -join "`n") }
     } finally {
         if ($null -eq $savedRuntimeDir) {
-            Remove-Item Env:HERMES_RUNTIME_DIR -ErrorAction SilentlyContinue
+            Remove-Item Env:KUBOT_RUNTIME_DIR -ErrorAction SilentlyContinue
         } else {
-            $env:HERMES_RUNTIME_DIR = $savedRuntimeDir
+            $env:KUBOT_RUNTIME_DIR = $savedRuntimeDir
         }
         if ($null -eq $savedHermesHome) {
-            Remove-Item Env:HERMES_HOME -ErrorAction SilentlyContinue
+            Remove-Item Env:KUBOT_HOME -ErrorAction SilentlyContinue
         } else {
-            $env:HERMES_HOME = $savedHermesHome
+            $env:KUBOT_HOME = $savedHermesHome
         }
         Remove-Item -LiteralPath $outFile -Force -ErrorAction SilentlyContinue
     }
 }
 
-$base = Join-Path ([System.IO.Path]::GetTempPath()) ("hermes-store-guard-" + [guid]::NewGuid())
+$base = Join-Path ([System.IO.Path]::GetTempPath()) ("kubot-store-guard-" + [guid]::NewGuid())
 $home1 = Join-Path $base 'home1'
 $dir1 = Join-Path $base 'checkout1'
 $insideHome = Join-Path $base 'checkout2'      # HermesHome nested inside InstallDir
@@ -117,34 +117,34 @@ try {
     try { $paths = $r.Stdout | ConvertFrom-Json } catch { $paths = $null }
     Assert-True ($null -ne $paths) 'accepted run prints the resolved-path JSON'
     if ($paths) {
-        Assert-True ("$($paths.hermes_home)" -eq $home1) 'hermes_home echoes the requested -HermesHome'
+        Assert-True ("$($paths.kubot_home)" -eq $home1) 'kubot_home echoes the requested -HermesHome'
         Assert-True ("$($paths.install_dir)" -eq $dir1) 'install_dir echoes the requested -InstallDir'
     }
 
-    # 4. HERMES_RUNTIME_DIR outside the checkout lifts the refusal: the store
+    # 4. KUBOT_RUNTIME_DIR outside the checkout lifts the refusal: the store
     #    no longer lands inside InstallDir, so the configuration is legitimate.
     $storeElsewhere = Join-Path $base 'store'
-    $saved = $env:HERMES_RUNTIME_DIR
+    $saved = $env:KUBOT_RUNTIME_DIR
     try {
-        $env:HERMES_RUNTIME_DIR = $storeElsewhere
+        $env:KUBOT_RUNTIME_DIR = $storeElsewhere
         $r = Invoke-ResolvedPaths @('-HermesHome', $home1, '-InstallDir', $home1)
-        Assert-True ($r.ExitCode -eq 0) "HERMES_RUNTIME_DIR outside lifts the refusal (exit $($r.ExitCode))"
+        Assert-True ($r.ExitCode -eq 0) "KUBOT_RUNTIME_DIR outside lifts the refusal (exit $($r.ExitCode))"
     } finally {
         if ($null -eq $saved) {
-            Remove-Item Env:HERMES_RUNTIME_DIR -ErrorAction SilentlyContinue
+            Remove-Item Env:KUBOT_RUNTIME_DIR -ErrorAction SilentlyContinue
         } else {
-            $env:HERMES_RUNTIME_DIR = $saved
+            $env:KUBOT_RUNTIME_DIR = $saved
         }
     }
 
     # 5. Default derivation never trips the guard: InstallDir defaults to
-    #    <HermesHome>\hermes-agent, which is a child, not a parent.
+    #    <HermesHome>\kubot-agent, which is a child, not a parent.
     $r = Invoke-ResolvedPaths @('-HermesHome', $home1)
     Assert-True ($r.ExitCode -eq 0) "default -InstallDir under -HermesHome stays accepted (exit $($r.ExitCode))"
     $paths = $null
     try { $paths = $r.Stdout | ConvertFrom-Json } catch { $paths = $null }
     if ($paths) {
-        Assert-True ("$($paths.install_dir)" -eq (Join-Path $home1 'hermes-agent')) 'default install_dir derives under hermes_home'
+        Assert-True ("$($paths.install_dir)" -eq (Join-Path $home1 'kubot-agent')) 'default install_dir derives under kubot_home'
     }
 } finally {
     Remove-Item -LiteralPath $base -Recurse -Force -ErrorAction SilentlyContinue

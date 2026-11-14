@@ -1,5 +1,5 @@
 name: global-business-culture
-repo: https://github.com/pswong661-eng/hermes-global-business-culture
+repo: https://github.com/pswong661-eng/kubot-global-business-culture
 sha: "49218a35f670ceae6f79dc07d40536b19da23cc6"
 version: "1.0.0"
 title: Global Business Culture
@@ -7,7 +7,7 @@ description: "Cross-cultural business intelligence: country culture briefs and h
 maintainer: pswong661-eng
 tier: community
 category: tools
-requires_hermes: ">=0.21.0"
+requires_kubot: ">=0.21.0"
 readme: true
 platforms: [linux, macos, windows]
 capabilities:

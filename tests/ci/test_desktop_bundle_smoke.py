@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
-import hermes_yaml
+import kubot_yaml
 import pytest
 
 from tests.ci.desktop_release_roles import (
@@ -20,7 +20,7 @@ from tests.scripts.test_release_r2 import r2_server
 
 
 def smoke_workflow():
-    return hermes_yaml.safe_load((ROOT / '.github/workflows/desktop-bundle-smoke.yml').read_text(encoding='utf-8-sig'))
+    return kubot_yaml.safe_load((ROOT / '.github/workflows/desktop-bundle-smoke.yml').read_text(encoding='utf-8-sig'))
 
 
 def smoke_fetch_script():
@@ -46,12 +46,12 @@ def smoke_fetch_script():
 
 
 def transport_env(tmp_path, server, *, commit=False):
-    return dict(HERMES_PAYLOAD_TAG='' if commit else TAG, HERMES_BUILD_COMMIT=SHA if commit else '',
+    return dict(KUBOT_PAYLOAD_TAG='' if commit else TAG, KUBOT_BUILD_COMMIT=SHA if commit else '',
                 RELEASE_TAG='' if commit else TAG, RELEASE_COMMIT=SHA, COMMIT_BUILD=str(commit).lower(),
-                PUBLIC_BASE=f'http://127.0.0.1:{server.server_port}/hermes-releases',
-                CLOUDFLARE_R2_PUBLIC_URL=f'http://127.0.0.1:{server.server_port}/hermes-releases',
+                PUBLIC_BASE=f'http://127.0.0.1:{server.server_port}/kubot-releases',
+                CLOUDFLARE_R2_PUBLIC_URL=f'http://127.0.0.1:{server.server_port}/kubot-releases',
                 CLOUDFLARE_R2_ACCOUNT_ID='loopback', CLOUDFLARE_R2_ACCESS_KEY_ID='test-inert',
-                CLOUDFLARE_R2_SECRET_ACCESS_KEY='test-inert', CLOUDFLARE_R2_BUCKET='hermes-releases',
+                CLOUDFLARE_R2_SECRET_ACCESS_KEY='test-inert', CLOUDFLARE_R2_BUCKET='kubot-releases',
                 RELEASE_PHASE='', SMOKE_ROOT=str(tmp_path / 'smoke'), GITHUB_OUTPUT=str(tmp_path / 'output'))
 
 
@@ -187,8 +187,8 @@ def test_stable_phase_result_requires_smoke_but_preserves_other_phases(tmp_path,
 
 def test_canary_publisher_consumes_staged_bytes_and_writes_pointer_last(tmp_path, r2_server):
     tag = 'v0.28.1+canary.20260818T101010Z'
-    env = {**transport_env(tmp_path, r2_server), 'HERMES_DESKTOP_VARIANT': 'bundled',
-           'HERMES_PAYLOAD_TAG': tag, 'RELEASE_TAG': tag}
+    env = {**transport_env(tmp_path, r2_server), 'KUBOT_DESKTOP_VARIANT': 'bundled',
+           'KUBOT_PAYLOAD_TAG': tag, 'RELEASE_TAG': tag}
     # Use the real assembly identity derivation with a stable base available.
     for file in ['scripts/msix-shared.mjs', 'scripts/release-content-types.json',
                  'apps/desktop/product-identity.cjs', 'apps/desktop/package.json']:

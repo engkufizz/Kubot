@@ -43,13 +43,13 @@ function Invoke-HermesProbe {
 function Get-HermesRuntimeCommand {
     param(
         [Parameter(Mandatory = $true)][string]$InstallRoot,
-        [string]$Module = 'hermes_cli.main'
+        [string]$Module = 'kubot_cli.main'
     )
 
     # The launcher owns interpreter/ABI and generation selection. Never infer
     # PM's store layout or borrow a different installation's PATH command.
-    foreach ($name in @('hermes.exe', 'hermes.cmd')) {
-        $launcher = Join-Path $InstallRoot ".hermes\bin\$name"
+    foreach ($name in @('kubot.exe', 'kubot.cmd')) {
+        $launcher = Join-Path $InstallRoot ".kubot\bin\$name"
         if (Test-Path -LiteralPath $launcher -PathType Leaf) {
             $probe = Invoke-HermesProbe $launcher @('--print-runtime-command', '--module', $Module)
             if ($probe.TimedOut) { throw "Installation launcher did not answer within the probe timeout: $launcher" }
@@ -64,14 +64,14 @@ function Get-HermesRuntimeCommand {
 
     # Earlier PM installers published only to user-bin. The established
     # --version surface reports the bound source root; never trust PATH alone.
-    if (Test-Path -LiteralPath (Join-Path $InstallRoot 'hermes_cli/_launchers.py') -PathType Leaf) {
+    if (Test-Path -LiteralPath (Join-Path $InstallRoot 'kubot_cli/_launchers.py') -PathType Leaf) {
         $directories = @(
-            (Join-Path $env:HERMES_HOME 'bin'),
+            (Join-Path $env:KUBOT_HOME 'bin'),
             (Join-Path (Split-Path -Parent $InstallRoot) 'bin')
         )
-        if ($env:LOCALAPPDATA) { $directories += Join-Path $env:LOCALAPPDATA 'hermes/bin' }
+        if ($env:LOCALAPPDATA) { $directories += Join-Path $env:LOCALAPPDATA 'kubot/bin' }
         foreach ($directory in ($directories | Select-Object -Unique)) {
-            foreach ($name in @('hermes.exe', 'hermes.cmd')) {
+            foreach ($name in @('kubot.exe', 'kubot.cmd')) {
                 $legacy = Join-Path $directory $name
                 if (-not (Test-Path -LiteralPath $legacy -PathType Leaf)) { continue }
                 $probe = Invoke-HermesProbe $legacy @('--version')
@@ -80,7 +80,7 @@ function Get-HermesRuntimeCommand {
                 $reported = [IO.Path]::GetFullPath($Matches[1].Trim()).TrimEnd('\', '/')
                 $expected = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\', '/')
                 if (-not [string]::Equals($reported, $expected, [StringComparison]::OrdinalIgnoreCase)) { continue }
-                if ($Module -ne 'hermes_cli.main') {
+                if ($Module -ne 'kubot_cli.main') {
                     throw "This older installation needs its launcher refreshed before running $Module. Run the update through $legacy."
                 }
                 return @($legacy)
@@ -95,5 +95,5 @@ function Get-HermesRuntimeCommand {
             if (Test-Path -LiteralPath $python -PathType Leaf) { return @($python, '-m', $Module) }
         }
     }
-    throw "Installation launcher is missing under $InstallRoot\.hermes\bin. Repair this installation."
+    throw "Installation launcher is missing under $InstallRoot\.kubot\bin. Repair this installation."
 }

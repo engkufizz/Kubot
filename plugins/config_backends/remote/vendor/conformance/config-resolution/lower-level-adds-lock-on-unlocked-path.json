@@ -102,7 +102,7 @@
       "by": "tenant",
       "op": "set",
       "path": "model.default",
-      "value": "hermes-3",
+      "value": "___PROTECTED_KUBOT_3_MODEL___",
       "expect": {
         "result": "accept"
       }

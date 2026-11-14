@@ -121,9 +121,9 @@ class TestHostedRoomRuns:
     async def test_invitation_uses_validated_app_managed_local_catalog(
         self, auth_adapter, monkeypatch
     ):
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.setenv("KUBOT_DESKTOP", "1")
         monkeypatch.setenv(
-            "HERMES_ROOM_LINK_URL", "https://peer.example.test/hermes"
+            "KUBOT_ROOM_LINK_URL", "https://peer.example.test/kubot"
         )
         app = _create_runs_app(auth_adapter)
         async with TestClient(TestServer(app)) as cli:
@@ -144,7 +144,7 @@ class TestHostedRoomRuns:
         assert body["catalog"]["link_modes"] == ["direct"]
         assert body["catalog"]["endpoint"] == {
             "available": True,
-            "url": "https://peer.example.test/hermes",
+            "url": "https://peer.example.test/kubot",
             "transport_security": "tls",
         }
         assert body["expires_at"] == body["status_expires_at"]

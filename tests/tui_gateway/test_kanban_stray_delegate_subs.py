@@ -8,11 +8,11 @@ session row but never touches kanban.db, so those cards kept notifying the subag
 import sqlite3
 from unittest.mock import patch
 
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
-from hermes_cli import kanban_db_notify as kbn
-from hermes_state import SessionDB
-from hermes_state_delegate_children import delegate_descendant_ids
+from kubot_cli import kanban_db as kb
+from kubot_cli import kanban_db_connect as kbc
+from kubot_cli import kanban_db_notify as kbn
+from kubot_state import SessionDB
+from kubot_state_delegate_children import delegate_descendant_ids
 from tui_gateway import server
 
 

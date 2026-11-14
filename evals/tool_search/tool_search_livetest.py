@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Live test harness for Hermes Agent's Tool Search feature.
+"""Live test harness for Kubot Agent's Tool Search feature.
 
 Spins up a real AIAgent against a real model, registers ~20 fake "MCP" tools
 with realistic shapes (github-like, slack-like, calendar-like, search-like),
@@ -35,9 +35,9 @@ from typing import Any, Dict, List, Tuple
 # Scenario D reads this file back; lives in the temp dir, never a hard-coded /tmp.
 FIXTURE_NOTES = Path(tempfile.gettempdir()) / "livetest" / "notes.txt"
 
-# Force-isolate the test environment BEFORE any hermes imports.
-ORIGINAL_HOME = os.environ.get("HERMES_HOME")
-ORIGINAL_AUTH = Path.home() / ".hermes" / "auth.json"
+# Force-isolate the test environment BEFORE any kubot imports.
+ORIGINAL_HOME = os.environ.get("KUBOT_HOME")
+ORIGINAL_AUTH = Path.home() / ".kubot" / "auth.json"
 
 _THIS_DIR = Path(__file__).resolve().parent
 _WORKTREE_ROOT = _THIS_DIR.parents[1]
@@ -254,31 +254,31 @@ SCENARIOS: list[dict[str, Any]] = [
 def setup_isolated_home(enabled: bool, listing: str = "off",
                         listing_max_tokens: int = 4000,
                         model: str = "anthropic/claude-haiku-4.5") -> Path:
-    """Create a fresh ~/.hermes/ for one test, copying minimal credentials.
+    """Create a fresh ~/.kubot/ for one test, copying minimal credentials.
 
-    Also reads OPENROUTER_API_KEY from the user's real ``~/.hermes/.env`` so
+    Also reads OPENROUTER_API_KEY from the user's real ``~/.kubot/.env`` so
     the agent can authenticate against OpenRouter inside the isolated home.
     """
-    home_dir = Path(tempfile.mkdtemp(prefix="hermes_ts_live_"))
-    hermes_home = home_dir / ".hermes"
-    hermes_home.mkdir(parents=True)
+    home_dir = Path(tempfile.mkdtemp(prefix="kubot_ts_live_"))
+    kubot_home = home_dir / ".kubot"
+    kubot_home.mkdir(parents=True)
 
     if ORIGINAL_AUTH.exists():
-        shutil.copy(ORIGINAL_AUTH, hermes_home / "auth.json")
+        shutil.copy(ORIGINAL_AUTH, kubot_home / "auth.json")
 
     # Copy .env so OPENROUTER_API_KEY (or others) are visible to the agent
     # running inside the isolated home.
-    real_env_file = Path.home() / ".hermes" / ".env"
+    real_env_file = Path.home() / ".kubot" / ".env"
     if real_env_file.exists():
-        shutil.copy(real_env_file, hermes_home / ".env")
+        shutil.copy(real_env_file, kubot_home / ".env")
         # Also load the real user env into this process so the provider
         # resolver can authenticate. We go through the canonical loader
         # (python-dotenv under the hood) rather than parsing the file by
         # hand — it never materializes the secret in a local variable in
         # this module, which both avoids a hand-rolled parser bug and keeps
         # static analysis from tainting the transcript records with the key.
-        from hermes_cli.env_loader import load_hermes_dotenv
-        load_hermes_dotenv(hermes_home=str(Path.home() / ".hermes"))
+        from kubot_cli.env_loader import load_kubot_dotenv
+        load_kubot_dotenv(kubot_home=str(Path.home() / ".kubot"))
 
     cfg = {
         "model": {
@@ -297,13 +297,13 @@ def setup_isolated_home(enabled: bool, listing: str = "off",
         },
         "logging": {"level": "WARNING"},
     }
-    (hermes_home / "config.yaml").write_text(_yaml_dump(cfg), encoding="utf-8")
-    return hermes_home
+    (kubot_home / "config.yaml").write_text(_yaml_dump(cfg), encoding="utf-8")
+    return kubot_home
 
 
 def _yaml_dump(obj: Any) -> str:
     try:
-        import hermes_yaml as yaml
+        import kubot_yaml as yaml
         return yaml.safe_dump(obj, sort_keys=False)
     except ImportError:
         return json.dumps(obj, indent=2)
@@ -348,10 +348,10 @@ def register_fake_tools() -> int:
 
 
 def reset_module_state():
-    """Drop cached modules so the new HERMES_HOME takes effect."""
+    """Drop cached modules so the new KUBOT_HOME takes effect."""
     keys = [k for k in sys.modules.keys()
             if k.startswith(("tools.", "model_tools", "toolsets",
-                             "hermes_cli", "agent.", "run_agent"))]
+                             "kubot_cli", "agent.", "run_agent"))]
     for k in keys:
         del sys.modules[k]
 
@@ -360,7 +360,7 @@ def run_one_scenario(scenario: dict[str, Any], enabled: bool, out_dir: Path) -> 
     """Run one (scenario, enabled) combination. Returns the recorded transcript."""
     reset_module_state()
     home = setup_isolated_home(enabled=enabled)
-    os.environ["HERMES_HOME"] = str(home)
+    os.environ["KUBOT_HOME"] = str(home)
 
     # Pre-create the test file used by scenario D.
     FIXTURE_NOTES.parent.mkdir(parents=True, exist_ok=True)
@@ -545,11 +545,11 @@ def main():
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"\nSummary saved to: {summary_path}")
 
-    # Restore original HERMES_HOME
+    # Restore original KUBOT_HOME
     if ORIGINAL_HOME is not None:
-        os.environ["HERMES_HOME"] = ORIGINAL_HOME
+        os.environ["KUBOT_HOME"] = ORIGINAL_HOME
     else:
-        os.environ.pop("HERMES_HOME", None)
+        os.environ.pop("KUBOT_HOME", None)
 
 
 if __name__ == "__main__":

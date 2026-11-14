@@ -1,4 +1,4 @@
-# Self-contained Hermes TUI, compiled by the same recipe as pnpm.
+# Self-contained Kubot TUI, compiled by the same recipe as pnpm.
 { hermesNpmLib, ... }:
 hermesNpmLib.buildPnpmPackage {
   dirs = [
@@ -19,8 +19,8 @@ hermesNpmLib.buildPnpmPackage {
 
   installPhase = ''
     runHook preInstall
-    mkdir -p $out/lib/hermes-tui
-    cp -r "$TMPDIR/tui-product/." $out/lib/hermes-tui/
+    mkdir -p $out/lib/kubot-tui
+    cp -r "$TMPDIR/tui-product/." $out/lib/kubot-tui/
     runHook postInstall
   '';
 }

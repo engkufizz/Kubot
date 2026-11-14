@@ -1,0 +1,17 @@
+name: kubot-kame-provider
+repo: https://github.com/Kame696/kame-api-rotation-for-kubot
+sha: 5888489348f3d1366f69a25f9fcb2135c0b966d7
+subdir: kubot-kame-provider
+description: "Companion to kubot-kame-api-rotation (install both). A model-provider plugin that re-registers Kubot' bundled API-key profiles unchanged except for create_client and create_messages_client, which return the rotation plugin's key-rotating client; otherwise None and Kubot builds its own. Same endpoints as Kubot, no third-party service, no core override."
+maintainer: Kame696
+tier: community
+category: models
+requires_kubot: ">=0.21.4"
+version: "1.8.4.2"
+docs_url: https://github.com/Kame696/kame-api-rotation-for-kubot/tree/v1.8.4.2/kubot-kame-provider#readme
+readme: true
+capabilities:
+  provides_tools: []
+  provides_hooks: []
+  provides_middleware: []
+  requires_env: []

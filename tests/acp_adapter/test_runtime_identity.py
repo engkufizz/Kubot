@@ -12,7 +12,7 @@ from acp_adapter.session import SessionState
 
 def test_version_flag_displays_derived_version(monkeypatch, capsys):
     monkeypatch.setattr(
-        "hermes_cli.version_info.get_version_info",
+        "kubot_cli.version_info.get_version_info",
         lambda: SimpleNamespace(base_version="1.2.3", derived_version="1.2.3+4.gabcdef0"),
     )
 
@@ -23,19 +23,19 @@ def test_version_flag_displays_derived_version(monkeypatch, capsys):
 
 def test_version_slash_command_displays_derived_version(monkeypatch):
     monkeypatch.setattr(
-        "hermes_cli.version_info.get_version_info",
+        "kubot_cli.version_info.get_version_info",
         lambda: SimpleNamespace(base_version="1.2.3", derived_version="1.2.3+4.gabcdef0"),
     )
 
     agent = object.__new__(HermesACPAgent)
     state = cast(SessionState, SimpleNamespace(cwd="."))
-    assert agent._handle_slash_command("/version", state) == "Hermes Agent v1.2.3+4.gabcdef0"
+    assert agent._handle_slash_command("/version", state) == "Kubot Agent v1.2.3+4.gabcdef0"
 
 
 @pytest.mark.asyncio
 async def test_initialize_advertises_base_version(monkeypatch):
     monkeypatch.setattr(
-        "hermes_cli.version_info.get_version_info",
+        "kubot_cli.version_info.get_version_info",
         lambda: SimpleNamespace(base_version="1.2.3", derived_version="1.2.3+4.gabcdef0"),
     )
 

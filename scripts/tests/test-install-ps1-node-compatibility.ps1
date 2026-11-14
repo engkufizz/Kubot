@@ -2,7 +2,7 @@
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 $installScript = Join-Path $repoRoot 'scripts\install.ps1'
-$testRoot = Join-Path ([IO.Path]::GetTempPath()) ("hermes-pm-delegation-" + [Guid]::NewGuid().ToString('N'))
+$testRoot = Join-Path ([IO.Path]::GetTempPath()) ("kubot-pm-delegation-" + [Guid]::NewGuid().ToString('N'))
 $testHome = Join-Path $testRoot 'home'
 $checkout = Join-Path $testRoot 'checkout'
 $script:Failures = 0

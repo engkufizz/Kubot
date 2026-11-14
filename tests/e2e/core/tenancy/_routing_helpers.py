@@ -5,8 +5,8 @@ identity, each accepting only its own randomly minted key. ``check_routing`` is 
 invariant every scenario shares: a request on a host the scenario did not select, or a
 selected host receiving any bearer other than its own, is a credential leak.
 
-Hermes itself runs for real in child processes (``hermes chat -q`` / ``hermes -z`` /
-``python -m tui_gateway.entry``) with HOME and HERMES_HOME inside the test's tmp dir,
+Kubot itself runs for real in child processes (``kubot chat -q`` / ``kubot -z`` /
+``python -m tui_gateway.entry``) with HOME and KUBOT_HOME inside the test's tmp dir,
 every credential/endpoint env var stripped, and only these fake hosts configured.
 """
 
@@ -27,7 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-import hermes_yaml as yaml
+import kubot_yaml as yaml
 
 from tests.fakes.fake_llm_provider import Error, FakeLLMServer, Text
 
@@ -45,28 +45,28 @@ def assert_routing(problems: list[str], ctx: str) -> None:
     assert not problems, "\n".join(problems) + "\n" + ctx
 
 
-# Env that could route or authenticate a child Hermes outside the fake fleet.
+# Env that could route or authenticate a child Kubot outside the fake fleet.
 _STRIP_SUFFIXES = ("_API_KEY", "_TOKEN", "_BASE_URL", "_SECRET", "_ACCESS_KEY", "_KEY_ID")
-_STRIP_PREFIXES = ("HERMES_", "OPENAI", "ANTHROPIC", "OPENROUTER", "AWS_", "AZURE_", "GOOGLE_",
+_STRIP_PREFIXES = ("KUBOT_", "OPENAI", "ANTHROPIC", "OPENROUTER", "AWS_", "AZURE_", "GOOGLE_",
                    "GEMINI", "PYTEST_", "NOUS_", "XAI_", "LLM_", "CUSTOM_")
 
 
-def hermetic_env(home: Path, hermes_home: Path | None = None, proxy: str | None = None) -> dict[str, str]:
+def hermetic_env(home: Path, kubot_home: Path | None = None, proxy: str | None = None) -> dict[str, str]:
     real_home = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve()
     fake = home.resolve()
     # The state-db guard is bypassed below, so prove first that this child can never reach the
     # real install: its HOME (and therefore every profile root) lives outside the real home.
-    assert fake != real_home and real_home / ".hermes" not in (fake, *fake.parents), fake
+    assert fake != real_home and real_home / ".kubot" not in (fake, *fake.parents), fake
     env = {k: v for k, v in os.environ.items()
            if not (k.endswith(_STRIP_SUFFIXES) or k.startswith(_STRIP_PREFIXES))}
     env.update(
         HOME=str(home),
-        HERMES_HOME=str(hermes_home or home / ".hermes"),
+        KUBOT_HOME=str(kubot_home or home / ".kubot"),
         PYTHONPATH=str(REPO_ROOT),
         NO_COLOR="1",
         TERM="dumb",
-        # A pytest-descendant child treats $HOME/.hermes/state.db as production; that HOME is ours.
-        HERMES_STATE_DB_GUARD_BYPASS="1",
+        # A pytest-descendant child treats $HOME/.kubot/state.db as production; that HOME is ours.
+        KUBOT_STATE_DB_GUARD_BYPASS="1",
     )
     for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy"):
         env.pop(var, None)
@@ -239,31 +239,31 @@ class EgressTrap:
 
 
 def inference_hosts() -> frozenset[str]:
-    """Hostnames of every inference API Hermes itself knows (its provider registry + OpenRouter).
+    """Hostnames of every inference API Kubot itself knows (its provider registry + OpenRouter).
 
     Read from the product, never copied: a CONNECT to one of these from a scenario that
     configured only loopback hosts is a prompt leaving for a real provider.
     """
     from urllib.parse import urlparse
 
-    from hermes_cli.auth import PROVIDER_REGISTRY
-    from hermes_constants import OPENROUTER_BASE_URL
+    from kubot_cli.auth import PROVIDER_REGISTRY
+    from kubot_constants import OPENROUTER_BASE_URL
 
     urls = [getattr(p, "inference_base_url", "") or "" for p in PROVIDER_REGISTRY.values()] + [OPENROUTER_BASE_URL]
     return frozenset(h for h in (urlparse(u).hostname for u in urls) if h and h not in {"127.0.0.1", "localhost"})
 
 
-# HERMES_HOME writing ------------------------------------------------------------
+# KUBOT_HOME writing ------------------------------------------------------------
 
 
-def write_home(hermes_home: Path, config: dict[str, Any], env: dict[str, str],
+def write_home(kubot_home: Path, config: dict[str, Any], env: dict[str, str],
                auth: dict[str, Any] | None = None) -> Path:
-    hermes_home.mkdir(parents=True, exist_ok=True)
-    (hermes_home / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
-    (hermes_home / ".env").write_text("".join(f"{k}={v}\n" for k, v in env.items()), encoding="utf-8")
+    kubot_home.mkdir(parents=True, exist_ok=True)
+    (kubot_home / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    (kubot_home / ".env").write_text("".join(f"{k}={v}\n" for k, v in env.items()), encoding="utf-8")
     if auth is not None:
-        (hermes_home / "auth.json").write_text(json.dumps(auth), encoding="utf-8")
-    return hermes_home
+        (kubot_home / "auth.json").write_text(json.dumps(auth), encoding="utf-8")
+    return kubot_home
 
 
 def pool_auth(provider: str, keys: Iterable[str]) -> dict[str, Any]:
@@ -274,7 +274,7 @@ def pool_auth(provider: str, keys: Iterable[str]) -> dict[str, Any]:
     ]}}
 
 
-# Child Hermes processes ---------------------------------------------------------
+# Child Kubot processes ---------------------------------------------------------
 
 
 @dataclass
@@ -286,13 +286,13 @@ class RunResult:
     seconds: float
 
 
-def run_hermes(argv: list[str], home: Path, *, hermes_home: Path | None = None, proxy: str | None = None,
+def run_kubot(argv: list[str], home: Path, *, kubot_home: Path | None = None, proxy: str | None = None,
                timeout: float = 240.0) -> RunResult:
-    """Run the real ``hermes`` entry point in its own process group; kill only that group."""
+    """Run the real ``kubot`` entry point in its own process group; kill only that group."""
     start = time.monotonic()
     proc = subprocess.Popen(
-        [sys.executable, "-m", "hermes_cli.main", *argv],
-        cwd=str(home), env=hermetic_env(home, hermes_home, proxy), stdin=subprocess.DEVNULL,
+        [sys.executable, "-m", "kubot_cli.main", *argv],
+        cwd=str(home), env=hermetic_env(home, kubot_home, proxy), stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True,
     )
     try:

@@ -191,7 +191,7 @@ def _every_download(tag):
                                          ("linux", "x64", "AppImage"), ("linux", "arm64", "AppImage"))
     ]
     return builds_table.render_tables(
-        builds_table.parse_assets(names), "https://hermes-assets.example.invalid",
+        builds_table.parse_assets(names), "https://kubot-assets.example.invalid",
         ["termux-deb (failure)", "smoke-windows (failure)"],
         "https://github.com/fixture/release/actions/runs/1",
     )
@@ -221,7 +221,7 @@ def test_canary_tag_pushed_without_a_draft_is_recovered_on_a_busy_repository(can
     git("tag", "v1.2.3")
     git("commit", "--allow-empty", "-qm", "feat: next")
     tag = "v1.2.3+canary.20260818T103000Z"
-    git("tag", "-a", tag, "-m", "Hermes Agent canary 20260818T103000Z")
+    git("tag", "-a", tag, "-m", "Kubot Agent canary 20260818T103000Z")
     git("push", "origin", f"refs/tags/{tag}")
 
     release.cmd_canary(SimpleNamespace(date="20260819T103000Z", publish=True, no_changelog=False, remote="origin"))
