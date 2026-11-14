@@ -78,13 +78,17 @@ KUBOT_AGENT_LOGO = """[bold #00E5FF]██╗  ██╗██╗   ██╗█
 [#0077B6]╚═╝  ╚═╝ ╚═════╝ ╚═════╝  ╚═════╝    ╚═╝   [/]"""
 KUBOT_AGENT_LOGO = KUBOT_AGENT_LOGO
 
-KUBOT_CADUCEUS = """[#00E5FF]         ┌──────────────┐         [/]
-[#00E5FF]        ┌┤  ●        ●  ├┐        [/]
-[#00B4D8]        ││      ▲       ││        [/]
-[#00B4D8]        └┤   ╰──────╯   ├┘        [/]
-[#0077B6]         └──┬────────┬──┘         [/]
-[#0077B6]            │  KUBOT │            [/]
-[#023E8A]            └────────┘            [/]"""
+KUBOT_CADUCEUS = """[bold #00E5FF]    ██              ██    [/]
+[bold #00E5FF]      ██          ██      [/]
+[#00E5FF]    ██████████████████    [/]
+[#00E5FF]  ██████████████████████  [/]
+[#00B4D8]████    [bold #FFFFFF]██[/]      [bold #FFFFFF]██[/]    [#00B4D8]████[/]
+[#00B4D8]████  [bold #FFFFFF]██  ██[/]  [bold #FFFFFF]██  ██[/]  [#00B4D8]████[/]
+[bold #E0FBFC]██████████████████████████[/]
+[#00B4D8]  ██████████████████████  [/]
+[#0077B6]    ██████████████████    [/]
+[#0077B6]    ██  ██      ██  ██    [/]
+[bold #00E5FF]         [KUBOT]          [/]"""
 KUBOT_MASCOT = KUBOT_CADUCEUS
 
 # === Skills scanning ===
@@ -601,7 +605,7 @@ def _banner_left_lines(model: str, cwd: str, session_id, context_length, provide
     marker = context_marker or ("pinned" if context_pinned else "")
     pin = f" ({marker})" if marker else ""
     ctx_str = _dim_sep(f"{_format_context_length(context_length)} context{pin}") if context_length else ""
-    nous_str = _dim_sep("Nous Research")
+    nous_str = ""
     if (provider or "").strip().lower() == "moa":
         # MoA virtual provider: ``model`` is a preset name; show it with its aggregator.
         agg_label = _quiet(lambda: _moa_aggregator_label(model), "")
