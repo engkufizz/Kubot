@@ -58,23 +58,16 @@ def project_root_str() -> str:
 
 
 def normalize_hermes_home_env() -> None:
-    """Expand ``~``/``$VAR`` in ``HERMES_HOME`` once, at process entry, and write it back.
-
-    fish does not expand ``~`` inside ``VAR=~/...`` and every shell passes a quoted value
-    through verbatim, so a literal tilde reaches the process. ``Path("~/.hermes")`` is
-    *relative*: the many raw ``os.environ["HERMES_HOME"]`` readers (this fast path, the
-    active_profile probe, profile re-home, the dotenv loader) would each resolve it against
-    cwd and scaffold a full home under ``<cwd>/~/.hermes``. One expansion here gives every
-    reader the same absolute spelling; ``hermes_constants`` expands as well for non-CLI
-    entry points. A relative value that is not tilde/variable-shaped is left alone.
+    """Expand ``~``/``$VAR`` in ``KUBOT_HOME`` once, at process entry, and write it back.
+    Always points KUBOT_HOME and HERMES_HOME to ~/.kubot unless KUBOT_HOME is explicitly set.
     """
-    raw = os.environ.get("KUBOT_HOME", os.environ.get("HERMES_HOME", ""))
-    if not raw.strip():
-        return
-    expanded = os.path.expanduser(os.path.expandvars(raw.strip()))
-    if expanded != raw:
-        os.environ["KUBOT_HOME"] = expanded
-        os.environ["HERMES_HOME"] = expanded
+    raw = os.environ.get("KUBOT_HOME", "").strip()
+    if not raw:
+        from pathlib import Path
+        raw = str(Path.home() / ".kubot")
+    expanded = os.path.expanduser(os.path.expandvars(raw))
+    os.environ["KUBOT_HOME"] = expanded
+    os.environ["HERMES_HOME"] = expanded
 
 
 def _realpath_or_self(path: str) -> str:
